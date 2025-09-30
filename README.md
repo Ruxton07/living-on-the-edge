@@ -1,4 +1,4 @@
-# Simple 2D Ecosystem (pygame)
+# Simple 2D Ecosystem
 
 ## Overview
 
