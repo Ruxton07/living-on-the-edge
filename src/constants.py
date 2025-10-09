@@ -8,6 +8,7 @@ CREATURE_COLOR = (61, 178, 255)
 FOOD_COLOR = (80, 200, 120)
 DEAD_COLOR = (220, 60, 60)
 
+# Radii
 CREATURE_RADIUS = 15
 FOOD_RADIUS = 15
 
@@ -16,6 +17,9 @@ TICKS_PER_SECOND = 60
 # Simulation parameters
 CREATURE_MAX_ENERGY = 1000  # ticks
 CREATURE_STEP_SIZE = 2.5   # pixels per tick
-GREEDY_CONSTANT = 1.5      # multiplier for food spawning in greedy simulation
 
+# Greedy simulation parameters
+GREEDY_CONSTANT = 1.1      # multiplier for food spawning in greedy simulation
+GREEDY_UNCERTAINTY = 0.3  # fraction of food to spawn with some randomness
 
+START_CREATURES = {'basic_simulation': 2, 'greedy_simulation': 3}
