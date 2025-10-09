@@ -69,8 +69,12 @@ You can either view the logged data in the csv files directly, or you can use th
 A cool observation I made today: compared to `basic_simulation`, `greedy_simulation` seems to have a much lower average population in the long run, but when the simulation first started, `greedy_simulation` had a much higher rate of population increase. I wish I had an explanation for why I'm observing this, but I don't. I would think they would perform the same in terms of slope because both simulations allow creatures to eat multiple foods, but its possible the randomness of food placement in `greedy_simulation` is causing this difference. I'll keep observing this as I add more features.
 
 Here are those graphs:
-![Basic Simulation - Average Population vs Static Food](images/bAvgPopFood.png)
-![Greedy Simulation - Average Population vs Static Food](images/gAvgPopFood.png)
+<p>
+<img src="images/bAvgPopFood.png" alt="Basic Simulation - Average Population vs Static Food" style="width:40%;" />
+</p>
+<p>
+<img src="images/gAvgPopFood.png" alt="Greedy Simulation - Average Population vs Static Food" style="width:40%;" />
+</p>
 
 For the next couple of entries, I plan to add mutations to the simulations, starting with speed mutations. This would be useful because it would allow me to collect more data like what I collected today, but with a new variable (such as speed mutation chance). I also plan to add more simulations, such as the additional greed rewarding and pandemic simulations mentioned in the last entry.
 
