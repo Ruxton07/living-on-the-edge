@@ -20,6 +20,7 @@ from constants import (
     TICKS_PER_SECOND,
     CREATURE_MAX_ENERGY,
     CREATURE_STEP_SIZE,
+    START_CREATURES,
 )
 from simulation import Simulation
 
@@ -110,8 +111,12 @@ class Creature:
     position: Tuple[float, float]
     direction: Tuple[float, float]
     energy: int = CREATURE_MAX_ENERGY
-    has_eaten: bool = False
+    has_eaten: int = 0  # Number of foods eaten (changed from bool to int)
     is_survivor: bool = False
+
+    def __str__(self) -> str:
+        status = "alive" if self.energy > 0 else "dead"
+        return f"Creature({status}, eaten {self.has_eaten}, energy: {self.energy})"
 
     # Creature.move()
     # 
@@ -138,14 +143,14 @@ class Creature:
             y <= CREATURE_RADIUS or y >= height - CREATURE_RADIUS
         )
 
-        if self.has_eaten and touched_edge:
+        if self.has_eaten > 0 and touched_edge:
             self.is_survivor = True
             x = clamp(x, CREATURE_RADIUS, width - CREATURE_RADIUS)
             y = clamp(y, CREATURE_RADIUS, height - CREATURE_RADIUS)
             self.position = (x, y)
             return
 
-        if not self.has_eaten:
+        if self.has_eaten == 0:
             bounced = False
             if x < CREATURE_RADIUS:
                 x = CREATURE_RADIUS
@@ -187,9 +192,11 @@ class BasicSimulation(Simulation):
     # 
     def __init__(self, width: int, height: int):
         super().__init__(width, height)
-        # Start with one creature randomly along the edge
-        start_pos = point_on_random_edge(self.width, self.height, margin=CREATURE_RADIUS)
-        self.creatures.append(Creature(position=start_pos, direction=random_unit_vector()))
+        # Start with creatures randomly along the edge
+        num_creatures = START_CREATURES['basic_simulation']
+        for _ in range(num_creatures):
+            start_pos = point_on_random_edge(self.width, self.height, margin=CREATURE_RADIUS)
+            self.creatures.append(Creature(position=start_pos, direction=random_unit_vector()))
 
     # Simulation.spawn_food_for_day(start_creature_count)
     # 
@@ -197,7 +204,12 @@ class BasicSimulation(Simulation):
     # @return None
     # 
     def spawn_food_for_day(self, start_creature_count: int) -> None:
-        count = start_creature_count
+        # Determine food count based on sim settings
+        if getattr(self, 'food_scaling', True):
+            count = start_creature_count
+        else:
+            fixed = getattr(self, 'fixed_food_count', None)
+            count = fixed if (isinstance(fixed, int) and fixed >= 0) else start_creature_count
         self.foods = []
         margin = max(FOOD_RADIUS + 2, CREATURE_RADIUS + 2)
         for _ in range(count):
@@ -219,8 +231,8 @@ class BasicSimulation(Simulation):
         self.creatures = new_creatures
 
     def handle_creature_collision(self, creature, food_index: int) -> None:
-        # Basic simulation: eating one food resets energy and marks as eaten
-        creature.has_eaten = True
+        # Basic simulation: eating one food resets energy and increments eaten count
+        creature.has_eaten += 1
         creature.energy = CREATURE_MAX_ENERGY
 
     def get_simulation_name(self) -> str:
