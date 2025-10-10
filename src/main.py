@@ -36,10 +36,10 @@ def run_simulation() -> None:
         title_surf = title_font.render('Select Simulation:', True, (240, 240, 245))
         option1_surf = option_font.render('1) BasicSimulation', True, (220, 220, 230))
         option2_surf = option_font.render('2) GreedySimulation', True, (220, 220, 230))
-        option3_surf = option_font.render('3) inc_food_basic_sim (increment food each run)', True, (220, 220, 230))
-        option4_surf = option_font.render('4) inc_food_greedy_sim (increment food each run)', True, (220, 220, 230))
-        option5_surf = option_font.render('5) inc_energy_basic_sim (increment creature energy each run)', True, (220, 220, 230))
-        option6_surf = option_font.render('6) inc_energy_greedy_sim (increment creature energy each run)', True, (220, 220, 230))
+        option3_surf = option_font.render('3) inc_food_basic_sim', True, (220, 220, 230))
+        option4_surf = option_font.render('4) inc_food_greedy_sim', True, (220, 220, 230))
+        option5_surf = option_font.render('5) inc_energy_basic_sim', True, (220, 220, 230))
+        option6_surf = option_font.render('6) inc_energy_greedy_sim', True, (220, 220, 230))
         hint_surf = hint_font.render('Esc to quit | \\ to show chart early', True, (180, 180, 190))
 
         # positions centered horizontally, spaced vertically
@@ -98,6 +98,8 @@ def run_simulation() -> None:
         files = [
             ('Basic avg population vs food', os.path.join(os.getcwd(), 'log', 'basic_average_population_vs_food.csv')),
             ('Greedy avg population vs food', os.path.join(os.getcwd(), 'log', 'greedy_average_population_vs_food.csv')),
+            ('Basic avg population vs energy', os.path.join(os.getcwd(), 'log', 'basic_average_population_vs_energy.csv')),
+            ('Greedy avg population vs energy', os.path.join(os.getcwd(), 'log', 'greedy_average_population_vs_energy.csv')),
         ]
         idx = 0
         while True:
@@ -217,27 +219,31 @@ def run_simulation() -> None:
 
     scale_food = None
     fixed_food_amount = None
-    # if an incremental-food sim was selected, skip scale prompt and ask for a starting fixed food
-    if selected in ('inc_food_basic_sim', 'inc_food_greedy_sim'):
+    # if an incremental-food or incremental-energy sim was selected, skip scale prompt and ask for a starting fixed food
+    if selected in ('inc_food_basic_sim', 'inc_food_greedy_sim', 'inc_energy_basic_sim', 'inc_energy_greedy_sim'):
         # ask for starting food amount (default 5)
         fixed_food_amount = prompt_fixed_amount(initial=5)
         scale_food = False
     else:
+        # show the scale menu and handle key events until the user picks Y/N
         while scale_food is None:
             draw_scale_menu()
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit(0)
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit(0)
-                if event.key == pygame.K_y or event.key == pygame.K_1:
-                    scale_food = True
-                if event.key == pygame.K_n or event.key == pygame.K_2:
-                    scale_food = False
-        clock.tick(30)
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        pygame.quit()
+                        sys.exit(0)
+                    # Accept 'y' or '1' for yes; 'n' or '2' for no
+                    if event.key == pygame.K_y or event.key == pygame.K_1:
+                        scale_food = True
+                        break
+                    if event.key == pygame.K_n or event.key == pygame.K_2:
+                        scale_food = False
+                        break
+            clock.tick(30)
 
     if scale_food is False and selected not in ('inc_food_basic_sim', 'inc_food_greedy_sim'):
         # ask for fixed food amount (default 5)
@@ -608,16 +614,17 @@ def render_population_graph(screen: pygame.Surface, day_rows: list) -> None:
     screen.blit(y0, (graph_rect.left - 18, graph_rect.bottom - 8))
     screen.blit(y_mid, (graph_rect.left - 28, int(graph_rect.top + graph_rect.height / 2) - 8))
     screen.blit(mp, (graph_rect.left - 30, graph_rect.top - 8))
-    #y ticks
-    pygame.draw.line(screen, axis_color, (graph_rect.left - 6, graph_rect.bottom), (graph_rect.left, graph_rect.bottom), 1)
+    # Draw Y ticks (exclude endpoints — labels already present at top/bottom)
     pygame.draw.line(screen, axis_color, (graph_rect.left - 6, int(graph_rect.top + graph_rect.height / 2)), (graph_rect.left, int(graph_rect.top + graph_rect.height / 2)), 1)
-    pygame.draw.line(screen, axis_color, (graph_rect.left - 6, graph_rect.top), (graph_rect.left, graph_rect.top), 1)
+
     # intermediate x ticks (up to 5 ticks)
     tick_count = min(5, max(2, max_day - min_day + 1))
     for i in range(tick_count):
         tx = graph_rect.left + i / max(1, tick_count - 1) * graph_rect.width
-        pygame.draw.line(screen, axis_color, (int(tx), graph_rect.bottom), (int(tx), graph_rect.bottom + 6), 1)
-        # Label every tick
+        # Don't draw tick marks at the endpoints — keep labels only
+        if i not in (0, tick_count - 1):
+            pygame.draw.line(screen, axis_color, (int(tx), graph_rect.bottom), (int(tx), graph_rect.bottom + 6), 1)
+        # Label every tick (including endpoints)
         label_day = int(min_day + i / max(1, tick_count - 1) * (max_day - min_day))
         lbl = font.render(str(label_day), True, (160, 160, 170))
         screen.blit(lbl, (int(tx) - lbl.get_width() // 2, graph_rect.bottom + 6))
@@ -670,22 +677,63 @@ def render_csv_graph(screen: pygame.Surface, csv_path: str) -> None:
     # Draw axes
     pygame.draw.rect(screen, EDGE_COLOR, graph_rect, width=1)
     font = pygame.font.SysFont(None, 18)
-    label = font.render('Average Population vs Food', True, (200, 200, 210))
+    # choose title based on file name (energy CSVs should be labeled 'Energy')
+    base_name = os.path.basename(csv_path).lower()
+    if 'energy' in base_name:
+        title_text = 'Average Population vs Energy'
+    else:
+        title_text = 'Average Population vs Food'
+    label = font.render(title_text, True, (200, 200, 210))
     screen.blit(label, (graph_rect.left, graph_rect.top - 22))
 
     max_y = max(ys)
-    display_max_y = max_y * 1.05
+    # avoid division by zero if max_y is 0
+    display_max_y = max(max_y, 1.0) * 1.05
 
-    points = []
+    # build pixel positions for each data point
+    points_info = []
     for i, (x, y) in enumerate(zip(xs, ys)):
         px = graph_rect.left + (i / max(1, len(xs) - 1)) * graph_rect.width
         py = graph_rect.bottom - (y / display_max_y) * graph_rect.height
-        points.append((int(px), int(py)))
+        points_info.append({'i': i, 'x': x, 'y': y, 'px': int(px), 'py': int(py)})
 
-    if len(points) >= 2:
-        pygame.draw.lines(screen, (120, 180, 220), False, points, 2)
-    elif len(points) == 1:
-        pygame.draw.circle(screen, (120, 180, 220), points[0], 3)
+    # If this is an energy CSV, treat very-low values as outliers: don't connect them into the main line
+    base_name = os.path.basename(csv_path).lower()
+    is_energy_csv = 'energy' in base_name
+    outlier_threshold = None
+    if is_energy_csv:
+        # threshold: 10% of max_y or at least 1
+        outlier_threshold = max(1.0, max_y * 0.10)
+
+    # Create connected segments of non-outlier points for the trend line
+    segments = []
+    current_seg = []
+    outlier_points = []
+    for p in points_info:
+        yval = p['y']
+        if is_energy_csv and yval < outlier_threshold:
+            outlier_points.append(p)
+            # break any current segment
+            if current_seg:
+                segments.append(current_seg)
+                current_seg = []
+        else:
+            current_seg.append((p['px'], p['py']))
+    if current_seg:
+        segments.append(current_seg)
+
+    # draw trend line segments
+    line_color = (120, 180, 220)
+    for seg in segments:
+        if len(seg) >= 2:
+            pygame.draw.lines(screen, line_color, False, seg, 2)
+        elif len(seg) == 1:
+            pygame.draw.circle(screen, line_color, seg[0], 3)
+
+    # draw outlier markers (as red small circles) so they are visible but don't dominate the trend
+    if outlier_points:
+        for p in outlier_points:
+            pygame.draw.circle(screen, (220, 80, 80), (p['px'], p['py']), 3)
 
     # labels and ticks
     axis_color = (180, 180, 190)
@@ -702,15 +750,15 @@ def render_csv_graph(screen: pygame.Surface, csv_path: str) -> None:
         screen.blit(y0, (graph_rect.left - 18, graph_rect.bottom - 8))
         screen.blit(y_mid, (graph_rect.left - 28, int(graph_rect.top + graph_rect.height / 2) - 8))
         screen.blit(y_max, (graph_rect.left - 30, graph_rect.top - 8))
-        # draw Y tick marks
-        pygame.draw.line(screen, axis_color, (graph_rect.left - 6, graph_rect.bottom), (graph_rect.left, graph_rect.bottom), 1)
+        # draw Y tick marks (exclude endpoints — labels already present at top/bottom)
         pygame.draw.line(screen, axis_color, (graph_rect.left - 6, int(graph_rect.top + graph_rect.height / 2)), (graph_rect.left, int(graph_rect.top + graph_rect.height / 2)), 1)
-        pygame.draw.line(screen, axis_color, (graph_rect.left - 6, graph_rect.top), (graph_rect.left, graph_rect.top), 1)
         # draw X ticks (up to 7 ticks depending on food count)
         tick_count = min(7, max(2, len(xs)))
         for i in range(tick_count):
             tx = graph_rect.left + i / max(1, tick_count - 1) * graph_rect.width
-            pygame.draw.line(screen, axis_color, (int(tx), graph_rect.bottom), (int(tx), graph_rect.bottom + 6), 1)
+            # Don't draw tick marks at the endpoints — keep labels only
+            if i not in (0, tick_count - 1):
+                pygame.draw.line(screen, axis_color, (int(tx), graph_rect.bottom), (int(tx), graph_rect.bottom + 6), 1)
             idx = int(i / max(1, tick_count - 1) * (len(xs) - 1))
             label_food = xs[idx]
             lbl = font.render(str(int(label_food)), True, (160, 160, 170))
