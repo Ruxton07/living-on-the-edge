@@ -10,12 +10,12 @@ DEAD_COLOR = (220, 60, 60)
 
 # Radii
 CREATURE_RADIUS = 15
-FOOD_RADIUS = 15
+FOOD_RADIUS = 5
 
 TICKS_PER_SECOND = 60
 
 # Simulation parameters
-CREATURE_MAX_ENERGY = 1000  # ticks
+CREATURE_MAX_ENERGY = 500  # ticks
 CREATURE_STEP_SIZE = 2.5   # pixels per tick
 
 # Greedy simulation parameters
