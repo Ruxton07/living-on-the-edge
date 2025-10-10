@@ -10,7 +10,7 @@ I started this developer log so I could document my progress on this project ove
 
 Before I start this entry, I feel that there is an important distinction to be made. When I mention a "simulation", I am referring to a single run of the program which may last multiple days, whereas when I mention a "day", I am referring to a single iteration of the simulation loop where creatures move around, eat food, and possibly reproduce.
 
-The first change I made today was that I made creatures gain a fixed amount of energy (250) when they eat food, rather than having their energy reset to max. I also made it so that if a creature's energy exceeds the max energy when they eat food, it is capped at the max energy.
+The first change I made today was that I made creatures gain a fixed amount of energy (constant--set to 250 for now) when they eat food, rather than having their energy reset to max. I also made it so that if a creature's energy exceeds the max energy when they eat food, it is capped at the max energy.
 
 I was planning for my next change to be implementing mutations, but decided I wanted to do another run of data collection, this time with average population changing as a function of time (days) for both `basic_simulation` and `greedy_simulation`. I set up the code to run 40 days for each max energy level from 200 to 500 (in increments of 5) and average the population as a function of days. Below I will explain some of the graphs I observed during this.
 
