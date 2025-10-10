@@ -3,7 +3,7 @@ import os
 import csv
 import pygame
 
-from constants import WORLD_WIDTH, WORLD_HEIGHT, BACKGROUND_COLOR, EDGE_COLOR
+from constants import WORLD_WIDTH, WORLD_HEIGHT, BACKGROUND_COLOR, EDGE_COLOR, SIM_GRAPH_Y_MARGIN
 from basic_simulation import BasicSimulation
 from greedy_simulation import GreedySimulation
 
@@ -484,7 +484,7 @@ def render_population_graph(screen: pygame.Surface, day_rows: list) -> None:
     max_day = max(days)
     max_pop = max(max(pops), 1)
     # add 5% headroom above max for easier viewing
-    display_max_pop = max_pop * 1.05
+    display_max_pop = max_pop * SIM_GRAPH_Y_MARGIN
     # scale and draw line
     points = []
     for (d, p) in zip(days, pops):
