@@ -86,3 +86,47 @@ Smaller additions that I'll be adding next time:
 - More data collection (such as average energy, age, etc.)
 
 Lastly, I should at least mention the topic of implementing AI into this project. I have been thinking about it, and I think it would be a really cool addition, but I also think it would be a lot of work to implement properly. I would LOVE to do some training with AI and see how it adapts, but it's important to remember that adding AI would be an entirely different branch of this project, and I don't want to get too sidetracked from my main goal of observing emergent behavior in a simulated ecosystem. So for now, I will put AI on the back burner, but I will definitely revisit it in the future if time permits. I do still value the idea of having AI and seeing how data collection changes, and that would also be a great way to extend off the great work Primer has already done.
+
+## 10/10/2025
+
+Before I start this entry, I feel that there is an important distinction to be made. When I mention a "simulation", I am referring to a single run of the program which may last multiple days, whereas when I mention a "day", I am referring to a single iteration of the simulation loop where creatures move around, eat food, and possibly reproduce.
+
+The first change I made today was that I made creatures gain a fixed amount of energy (250) when they eat food, rather than having their energy reset to max. I also made it so that if a creature's energy exceeds the max energy when they eat food, it is capped at the max energy.
+
+I was planning for my next change to be implementing mutations, but decided I wanted to do another run of data collection, this time with average population changing as a function of time (days) for both `basic_simulation` and `greedy_simulation`. I set up the code to run 40 days for each max energy level from 200 to 500 (in increments of 5) and average the population as a function of days. Below I will explain some of the graphs I observed during this.
+
+1 Day of Basic Simulation
+<p>
+    <img src="images/bPopEnergy1.png" alt="Basic Simulation - 1 Day Population vs Energy" style="width:40%;"/>
+</p>
+
+3 Days of Greedy Simulation
+<p>
+    <img src="images/gPopEnergy1.png" alt="Greedy Simulation - 1 Day Population vs Energy (1)" style="width:33%;" />
+    <img src="images/gPopEnergy2.png" alt="Greedy Simulation - 1 Day Population vs Energy (2)" style="width:33%;" />
+    <img src="images/gPopEnergy3.png" alt="Greedy Simulation - 1 Day Population vs Energy (3)" style="width:33%;" />
+</p>
+
+As you can tell, on the small scale the basic simulation tends to be more volatile (with frequent high and low population spikes), but in the long run tends to remain around the same average population. The greedy simulation, on the other hand, tends to be much more stable on the small scale, but in the long run tends to have a much more volatile average population.
+
+This is *especially* apparent when you look at the average population graphs as a function of energy:
+
+Volatile Basic and Greedy Simulation
+<p>
+    <img src="images/bAvgPopEnergyVolatile.png" alt="Basic Simulation - Population vs Energy" style="width:40%;"/>
+    <img src="images/gAvgPopEnergyVolatile.png" alt="Greedy Simulation - Population vs Energy" style="width:40%;" />
+</p>
+
+Notice how much more consistent the volatility is in the greedy simulation compared to the basic simulation. This is likely because of the fact that in the greedy simulation, food is placed randomly, it only takes 1 day of bad luck to cause a significant population drop, and those drops have a much more significant effect on the average population. To help view general trends in these graphs, I also created "smoothed" versions of them, cutting out the line for extremities and plotting them as scatter points instead:
+
+Smoothed Basic and Greedy Simulation
+<p>
+    <img src="images/bAvgPopEnergy.png" alt="Basic Simulation - Average Population vs Energy" style="width:40%;"/>
+    <img src="images/gAvgPopEnergy.png" alt="Greedy Simulation - Average Population vs Energy" style="width:40%;" />
+</p>
+
+Even so, it's still difficult to view the general trend of the greedy simulations due to consistent volatility. However, the higher the energy, the less volatile the population seems to be, which makes sense because creatures can move around more and have a higher chance of finding food and building a stable population.
+
+An interesting and related phenomenon to explore at a later date would be finding the minimum population that (with little error) guarantees long-term survival of the population in a given ecosystem. In other words, is there a specific number/threshold of creatures that, if the population reaches it, the population is guaranteed to live for a significant amount of time (or forever)? Or perhaps the inverse: if the population drops below it, the population is guaranteed to go extinct?
+
+In terms of project functionality, today was mostly QOL improvements and data collection. I did not add mutations as I had planned, but I think it was worth it to collect this data first. Now, I am ready to move on to mutations, which I will likely start on in the next entry.
