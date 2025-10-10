@@ -22,4 +22,8 @@ CREATURE_STEP_SIZE = 2.5   # pixels per tick
 GREEDY_CONSTANT = 1.1      # multiplier for food spawning in greedy simulation
 GREEDY_UNCERTAINTY = 0.3  # fraction of food to spawn with some randomness
 
+# Graph display margin
+SIM_GRAPH_Y_MARGIN = 1.05  # 5% headroom above max for easier viewing
+
+# Starting number of creatures per simulation type
 START_CREATURES = {'basic_simulation': 2, 'greedy_simulation': 3}
