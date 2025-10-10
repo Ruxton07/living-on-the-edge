@@ -19,6 +19,7 @@ from constants import (
     FOOD_RADIUS,
     TICKS_PER_SECOND,
     CREATURE_MAX_ENERGY,
+    FOOD_ENERGY,
     CREATURE_STEP_SIZE,
     START_CREATURES,
 )
@@ -233,7 +234,8 @@ class BasicSimulation(Simulation):
     def handle_creature_collision(self, creature, food_index: int) -> None:
         # Basic simulation: eating one food resets energy and increments eaten count
         creature.has_eaten += 1
-        creature.energy = CREATURE_MAX_ENERGY
+        # Add energy gained from food, clamped to max energy
+        creature.energy = int(min(creature.energy + FOOD_ENERGY, CREATURE_MAX_ENERGY))
 
     def get_simulation_name(self) -> str:
         return "BasicSimulation"

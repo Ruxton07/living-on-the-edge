@@ -3,7 +3,7 @@ import os
 import csv
 import pygame
 
-from constants import WORLD_WIDTH, WORLD_HEIGHT, BACKGROUND_COLOR, EDGE_COLOR, SIM_GRAPH_Y_MARGIN
+from constants import WORLD_WIDTH, WORLD_HEIGHT, BACKGROUND_COLOR, EDGE_COLOR, SIM_GRAPH_Y_MARGIN, DATA_SIM_RUNS, DATA_SIM_ENERGY_START, DATA_SIM_ENERGY_INCREMENT
 from basic_simulation import BasicSimulation
 from greedy_simulation import GreedySimulation
 
@@ -38,6 +38,8 @@ def run_simulation() -> None:
         option2_surf = option_font.render('2) GreedySimulation', True, (220, 220, 230))
         option3_surf = option_font.render('3) inc_food_basic_sim (increment food each run)', True, (220, 220, 230))
         option4_surf = option_font.render('4) inc_food_greedy_sim (increment food each run)', True, (220, 220, 230))
+        option5_surf = option_font.render('5) inc_energy_basic_sim (increment creature energy each run)', True, (220, 220, 230))
+        option6_surf = option_font.render('6) inc_energy_greedy_sim (increment creature energy each run)', True, (220, 220, 230))
         hint_surf = hint_font.render('Esc to quit | \\ to show chart early', True, (180, 180, 190))
 
         # positions centered horizontally, spaced vertically
@@ -48,13 +50,17 @@ def run_simulation() -> None:
         option2_pos = (width // 2 - option2_surf.get_width() // 2, int(y_center + spacing))
         option3_pos = (width // 2 - option3_surf.get_width() // 2, int(y_center + spacing * 2))
         option4_pos = (width // 2 - option4_surf.get_width() // 2, int(y_center + spacing * 3))
-        hint_pos = (width // 2 - hint_surf.get_width() // 2, int(y_center + spacing * 4.5))
+        option5_pos = (width // 2 - option5_surf.get_width() // 2, int(y_center + spacing * 4))
+        option6_pos = (width // 2 - option6_surf.get_width() // 2, int(y_center + spacing * 5))
+        hint_pos = (width // 2 - hint_surf.get_width() // 2, int(y_center + spacing * 6.5))
 
         screen.blit(title_surf, title_pos)
         screen.blit(option1_surf, option1_pos)
         screen.blit(option2_surf, option2_pos)
         screen.blit(option3_surf, option3_pos)
         screen.blit(option4_surf, option4_pos)
+        screen.blit(option5_surf, option5_pos)
+        screen.blit(option6_surf, option6_pos)
         screen.blit(hint_surf, hint_pos)
         pygame.display.flip()
 
@@ -145,6 +151,10 @@ def run_simulation() -> None:
                     selected = 'inc_food_basic_sim'
                 if event.key == pygame.K_4:
                     selected = 'inc_food_greedy_sim'
+                if event.key == pygame.K_5:
+                    selected = 'inc_energy_basic_sim'
+                if event.key == pygame.K_6:
+                    selected = 'inc_energy_greedy_sim'
         clock.tick(30)
     # after selecting simulation type, ask whether food should scale with population
     def draw_scale_menu() -> None:
@@ -277,7 +287,7 @@ def run_simulation() -> None:
         if selected in ('inc_food_basic_sim', 'inc_food_greedy_sim'):
             # starting food is fixed_food_amount
             start_food = fixed_food_amount if isinstance(fixed_food_amount, int) else 5
-            runs = 50
+            runs = DATA_SIM_RUNS
             # determine CSV path base name
             if selected == 'inc_food_basic_sim':
                 avg_csv_name = 'basic_average_population_vs_food.csv'
@@ -355,6 +365,87 @@ def run_simulation() -> None:
                 run_idx += 1
 
             # (never reached) continue
+        # energy-based incremental sims: vary creature max energy per run and record average population
+        if selected in ('inc_energy_basic_sim', 'inc_energy_greedy_sim'):
+            start_energy = DATA_SIM_ENERGY_START
+            energy_increment = DATA_SIM_ENERGY_INCREMENT
+            runs = DATA_SIM_RUNS
+            if selected == 'inc_energy_basic_sim':
+                avg_csv_name = 'basic_average_population_vs_energy.csv'
+                sim_factory = BasicSimulation
+            else:
+                avg_csv_name = 'greedy_average_population_vs_energy.csv'
+                sim_factory = GreedySimulation
+
+            log_dir = os.path.join(os.getcwd(), 'log')
+            os.makedirs(log_dir, exist_ok=True)
+            avg_csv_path = os.path.join(log_dir, avg_csv_name)
+            if not os.path.exists(avg_csv_path):
+                with open(avg_csv_path, 'w', newline='') as f:
+                    w = csv.writer(f)
+                    w.writerow(['energy', 'average_population'])
+
+            current_energy = start_energy
+            run_idx = 1
+            while True:
+                sim = sim_factory(WORLD_WIDTH, WORLD_HEIGHT)
+                # force fixed food behavior (user provided fixed_food_amount)
+                setattr(sim, 'food_scaling', False)
+                setattr(sim, 'fixed_food_count', int(fixed_food_amount) if isinstance(fixed_food_amount, int) else 0)
+                setattr(sim, 'verbose', bool(verbose_choice))
+                sim.speed_steps = max(1, current_speed_steps)
+
+                # Override creature max energy provider for this instance
+                sim.get_creature_max_energy = (lambda e=current_energy: int(e))
+                # Also set each starting creature's current energy
+                for c in sim.creatures:
+                    c.energy = int(current_energy)
+
+                pygame.display.set_caption(f'Ecosystem Simulator – {selected} (run {run_idx}/{runs} energy={current_energy})')
+
+                # Run exactly 50 days per run
+                day_rows = []
+                for day in range(1, 50 + 1):
+                    sim.day = day
+
+                    start_creatures, food_spawned, survivors, died = sim.simulate_day(screen, clock)
+                    current_speed_steps = sim.speed_steps
+                    sim.log_day(simulation_id, day, start_creatures, food_spawned, survivors, died)
+                    end_creatures = survivors
+                    day_rows.append((day, start_creatures, food_spawned, survivors, died, end_creatures))
+
+                    sim.reproduce_survivors()
+
+                    if getattr(sim, 'manual_stop', False):
+                        break
+
+                screen.fill(BACKGROUND_COLOR)
+                pygame.draw.rect(screen, EDGE_COLOR, pygame.Rect(0, 0, sim.width, sim.height), width=2)
+                for creature in sim.creatures:
+                    creature.draw(screen)
+                for food in sim.foods:
+                    food.draw(screen)
+                render_population_graph(screen, day_rows[-20:])
+                pygame.display.flip()
+                base_delay_ms = 5000
+                delay_ms = max(500, base_delay_ms // max(1, sim.speed_steps))
+                write_recent_csv(simulation_id, day_rows)
+                pygame.time.delay(delay_ms)
+
+                # compute average population for the run
+                if day_rows:
+                    avg_pop = sum(r[1] for r in day_rows) / len(day_rows)
+                else:
+                    avg_pop = 0
+                with open(avg_csv_path, 'a', newline='') as f:
+                    w = csv.writer(f)
+                    w.writerow([int(current_energy), float(avg_pop)])
+
+                current_energy += energy_increment
+                simulation_id += 1
+                run_idx += 1
+
+            # (never reached)
         if selected == 'BasicSimulation':
             sim = BasicSimulation(WORLD_WIDTH, WORLD_HEIGHT)
         elif selected == 'GreedySimulation':

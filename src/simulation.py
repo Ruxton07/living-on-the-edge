@@ -19,18 +19,18 @@ class Simulation:
         self.day: int = 0
         # speed controller (steps per frame)
         self.speed_steps: int = 1
-        # Common simulation state
+        # common simulation state
         self.creatures: List = []
         self.foods: List = []
         self.food_spawned = 0
-        # Food spawning configuration (menu-controlled)
+        # food spawning configuration (menu-controlled)
         self.food_scaling = True
         self.fixed_food_count = None
         self.manual_stop = False
-        # Verbose logging flag (menu-controlled)
+        # verbose logging flag (menu-controlled)
         self.verbose = False
 
-        # Prepare logging
+        # prepare logging
         self.log_dir = os.path.join(os.getcwd(), 'log')
         os.makedirs(self.log_dir, exist_ok=True)
         self.csv_path = os.path.join(self.log_dir, 'day_stats.csv')
@@ -70,7 +70,7 @@ class Simulation:
     # @return (start_creatures, food_spawned, survivors, died)
     # 
     def simulate_day(self, screen: pygame.Surface, clock: pygame.time.Clock) -> Tuple[int, int, int, int]:
-        # Reset daily flags
+        # reset daily flags
         for c in self.creatures:
             c.energy = self.get_creature_max_energy()
             c.has_eaten = 0
@@ -91,14 +91,14 @@ class Simulation:
                     raise SystemExit(0)
                 if event.type == pygame.KEYDOWN:
                     if event.key in (pygame.K_PLUS, pygame.K_EQUALS):
-                        # Allow doubling up to 128x
+                        # allow doubling up to 128x
                         self.speed_steps = min(128, self.speed_steps * 2)
                         pygame.display.set_caption(f'Ecosystem Simulator – {self.get_simulation_name()} (x{self.speed_steps})')
                     elif event.key in (pygame.K_MINUS, pygame.K_UNDERSCORE):
                         self.speed_steps = max(1, max(1, self.speed_steps // 2))
                         pygame.display.set_caption(f'Ecosystem Simulator – {self.get_simulation_name()} (x{self.speed_steps})')
                     elif event.key == pygame.K_BACKSLASH:
-                        # Manual stop: end the day immediately and proceed to charts
+                        # manual stop: end the day immediately and proceed to charts
                         self.manual_stop = True
                         running_day = False
                         break
@@ -127,9 +127,8 @@ class Simulation:
                         self.speed_steps = 128
                         pygame.display.set_caption(f'Ecosystem Simulator – {self.get_simulation_name()} (x{self.speed_steps})')
 
-            # Update logic multiple times per frame based on speed
             for _ in range(self.speed_steps):
-                # Create a copy to iterate over to avoid issues with list modification
+                # Cceate a copy to iterate over to avoid issues with list modification
                 creatures_to_process = self.creatures.copy()
                 for creature in creatures_to_process:
                     if creature.is_survivor:
@@ -138,7 +137,7 @@ class Simulation:
                         continue
                     creature.move()
                     creature.handle_edges(self.width, self.height)
-                    # Allow creatures to eat multiple foods per day: do not gate
+                    # allow creatures to eat multiple foods per day: do not gate
                     # collisions on has_eaten. Only require the creature to be alive.
                     if creature.energy > 0:
                         collided_index: Optional[int] = None
@@ -150,13 +149,13 @@ class Simulation:
                             del self.foods[collided_index]
                             self.handle_creature_collision(creature, collided_index)
 
-                # If no food remains, all uneaten creatures instantly die
+                # if no food remains, all uneaten creatures instantly die
                 if len(self.foods) == 0:
                     for c in self.creatures:
                         if c.has_eaten == 0 and not c.is_survivor and c.energy > 0:
                             c.energy = 0
 
-                # Check if day finished - only count living creatures (not dead bodies)
+                # check if day finished and only count living creatures (not dead bodies)
                 all_done = True
                 for c in self.creatures:
                     if c.is_survivor:
@@ -168,7 +167,6 @@ class Simulation:
                     running_day = False
                     break
 
-            # Draw
             screen.fill(BACKGROUND_COLOR)
             pygame.draw.rect(screen, EDGE_COLOR, pygame.Rect(0, 0, self.width, self.height), width=2)
             for food in self.foods:
@@ -178,11 +176,11 @@ class Simulation:
             pygame.display.flip()
             clock.tick(TICKS_PER_SECOND)
 
-        # Count survivors and deaths (dead creatures still in list as bodies)
+        # count survivors and deaths (dead creatures still in list as bodies)
         survivors = sum(1 for c in self.creatures if c.is_survivor)
         died = sum(1 for c in self.creatures if (not c.is_survivor))
 
-        # Remove dead creatures at end of day for next day's reproduction
+        # remove dead creatures at end of day for next day's reproduction
         self.creatures = [c for c in self.creatures if c.is_survivor]
 
         return start_creatures, self.food_spawned, survivors, died
@@ -202,23 +200,22 @@ class Simulation:
         with open(self.csv_path, 'a', newline='') as f:
             writer = csv.writer(f)
             writer.writerow([day, start_creatures, food_spawned, survivors, died, end_creatures])
-        # Pretty-print per-day summary only when verbose is enabled
+        # per-day summary only when verbose is enabled
         if getattr(self, 'verbose', False):
-            # Compact creature summaries: index, eaten, energy, survivor
             creature_summaries = []
             for idx, c in enumerate(self.creatures, start=1):
                 creature_summaries.append(f"#{idx}: eaten={c.has_eaten} energy={c.energy} survivor={c.is_survivor}")
             summary_lines = [f"Simulation {sim_id} | Day {day:03d} | start={start_creatures} food={food_spawned} survived={survivors} died={died} end={end_creatures}"]
             if creature_summaries:
                 summary_lines.append("Creatures:")
-                # Show up to first 10 creature summaries to avoid spamming
+                # show up to first 10 creature summaries to avoid spamming
                 for line in creature_summaries[:10]:
                     summary_lines.append(f"  {line}")
                 if len(creature_summaries) > 10:
                     summary_lines.append(f"  ...(+{len(creature_summaries)-10} more)")
             print("\n".join(summary_lines))
 
-    # Abstract methods that subclasses must implement
+    # abstract methods that subclasses must implement
     def get_simulation_name(self) -> str:
         raise NotImplementedError
 

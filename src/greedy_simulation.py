@@ -6,6 +6,7 @@ from constants import (
     CREATURE_RADIUS,
     FOOD_RADIUS,
     CREATURE_MAX_ENERGY,
+    FOOD_ENERGY,
     GREEDY_CONSTANT,
     GREEDY_UNCERTAINTY,
     START_CREATURES,
@@ -92,9 +93,8 @@ class GreedySimulation(Simulation):
     def handle_creature_collision(self, creature, food_index: int) -> None:
         # Greedy simulation: track how many foods eaten using has_eaten counter
         creature.has_eaten += 1
-        
-        # Reset energy on any food consumption
-        creature.energy = CREATURE_MAX_ENERGY
+        # Add food energy, clamped to max
+        creature.energy = int(min(creature.energy + FOOD_ENERGY, CREATURE_MAX_ENERGY))
 
     def get_simulation_name(self) -> str:
         return "GreedySimulation"
