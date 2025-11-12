@@ -21,7 +21,6 @@ from basic_simulation import (
     random_unit_vector,
 )
 
-
 class GreedySimulation(Simulation):
     # GreedySimulation.__init__(width, height)
     # 
