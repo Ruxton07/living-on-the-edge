@@ -9,13 +9,13 @@ FOOD_COLOR = (80, 200, 120)
 DEAD_COLOR = (220, 60, 60)
 
 # Radii
-CREATURE_RADIUS = 15
+CREATURE_RADIUS = 12
 FOOD_RADIUS = 5
 
 TICKS_PER_SECOND = 60
 
 # Simulation parameters
-CREATURE_MAX_ENERGY = 500  # ticks
+CREATURE_MAX_ENERGY = 750  # ticks
 CREATURE_STEP_SIZE = 2.5   # pixels per tick
 FOOD_ENERGY = 250
 
@@ -31,5 +31,9 @@ DATA_SIM_RUNS = 40
 DATA_SIM_ENERGY_START = 200
 DATA_SIM_ENERGY_INCREMENT = 5
 
-# Starting number of creatures per simulation type
-START_CREATURES = {'basic_simulation': 2, 'greedy_simulation': 3}
+# Starting number of creatures per simulation type (default to 5 for all sims)
+START_CREATURES = {'basic_simulation': 5, 'greedy_simulation': 5, 'mutation_simulation': 5}
+
+# Mutation configuration
+# Fractional +/- change applied to speed on replication (e.g. 0.05 = ±5%)
+MUTATION_SPEED_DELTA = 0.10
