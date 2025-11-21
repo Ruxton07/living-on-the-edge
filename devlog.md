@@ -6,6 +6,38 @@ I started this developer log so I could document my progress on this project ove
 
 ## Entries
 
+### 11/20/2025
+
+Today I made a few basic changes to the UI since I found it a pain to show other people for testing purposes. There were also a couple bugs I needed to fix that were causing unexpect UI behavior.
+
+I also created the mutation simulation today. To keep it simple, I only implemented speed mutations for now. The way it works is that when a creature replicates, its child has a chance to have its speed increased or decreased by up to 10% (which can be changed through a constant in `constants.py`) of the parent's speed. This means that over time, we should see creatures evolving to be faster or slower based on their ability to find food and survive.
+
+The caveat is that faster creatures use more energy per movement, so there is a trade-off between speed and energy efficiency. This should force creatures to trend towards the most optimized speed.
+
+Before I show you the graphs, I thought I might as well add a section in here to remind myself how painful it was to generate clean graphs. The graphs right now are computed by average creature speeds on a given day, but the problem is that the average speed turns out to be way more volatile than I thought when that's the only mutation being applied.
+
+This means that the graphs are very noisy and hard to interpret. To fix this, I had to implement a smoothing algorithm that averages the speeds over a window of days to get a clearer picture of the trend. It was a bit of a pain, but I think it was worth it to get more interpretable results.
+
+As for the numeric average, I only use the last 90% of the data to avoid skewing from the start of the simulation which took some time to stabilize.
+
+Here are the graphs for average speed over time for different max energy levels:
+<p>
+    <img src="images/mutation_simulation_speed_500.png" alt="Mutation Simulation - Average Speed over Time (Energy 500)" style="width:40%;"/>
+    <img src="images/mutation_simulation_speed_750.png" alt="Mutation Simulation - Average Speed over Time (Energy 750)" style="width:40%;"/>
+</p>
+
+The blue and red lines are different levels of permitted volatility of the trendline, and the grey dots are raw plotted values. The difference between these graphs is that the left one is for a max energy of 500, and the right one is for a max energy of 750. As you can see, the higher max energy allows for a higher average speed over time, which makes sense because creatures can afford to be faster without running out of energy as quickly.
+
+When I first tried to generate multiple graphs I tested energy 250 and 300, but they both were actually so inconsistent, (in that the populations couldn't survive for a significant amount of time) that I couldn't even generate good graphs for them that accurately depicted long term trends. In order to make those energy values work I would have had to increase creature or food radius, which I generally don't like to touch.
+
+Another thing I noticed was that the 750 energy simulation was much less volatile in average speed values, and the optimization is much more clear. I don't actually have any hypotheses for why this is, but I may explore it later if I continue looking at speed as an isolated mutation.
+
+One thing I'm curious about is what the scaling factor between max energy and speed is. In another words, I multipled the max creature energy by 1.5x and as a result the recorded long-term optimized creature speed went from 9.9 to 11.06, which is about a 1.12x increase. I wonder if this scaling factor remains consistent as I increase max energy further, or if it changes. It's late and I've got a lot of work to do tomorrow, so I'll leave that for another day.
+
+As for next time, I plan to explore this trend, and also add more mutations such as size and intelligence. Honestly I probably won't do any more exploration into my previous tests with greedy and basic simulations (and changing variables like food and energy), because I didn't find any findings significant or meaningful enough that I was intrigured about them.
+
+At some point in the future I may explore isolating other mutatations in the same way I did with speed, although I suspect that, at least for size and intelligence, the results will probably be very similar if not the same. But nevertheless, I think it's worth exploring. Whether I actually do it or not will depend on if the results from the above experiment I have planned for next time are interesting enough that I become engrossed in trying alterations of it.
+
 ### 10/10/2025
 
 Before I start this entry, I feel that there is an important distinction to be made. When I mention a "simulation", I am referring to a single run of the program which may last multiple days, whereas when I mention a "day", I am referring to a single iteration of the simulation loop where creatures move around, eat food, and possibly reproduce.
