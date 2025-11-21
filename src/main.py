@@ -6,20 +6,20 @@ import pygame
 from constants import WORLD_WIDTH, WORLD_HEIGHT, BACKGROUND_COLOR, EDGE_COLOR, SIM_GRAPH_Y_MARGIN, DATA_SIM_RUNS, DATA_SIM_ENERGY_START, DATA_SIM_ENERGY_INCREMENT
 from basic_simulation import BasicSimulation
 from greedy_simulation import GreedySimulation
+from mutation_simulation import MutationSimulation
 
 
 # run_simulation()
-# 
+#
 # @return None
-# 
+#
 def run_simulation() -> None:
     pygame.init()
-    # using SCALED to handle HiDPI/Retina so the logical size appears correct
     screen = pygame.display.set_mode((WORLD_WIDTH, WORLD_HEIGHT), pygame.SCALED | pygame.RESIZABLE)
     pygame.display.set_caption('Ecosystem Simulator – Select Simulation')
     clock = pygame.time.Clock()
 
-    def draw_menu() -> None:
+    def draw_menu(mode: str) -> None:
         # dynamically size menu based on current window size to avoid cutoff
         screen.fill(BACKGROUND_COLOR)
         width, height = screen.get_size()
@@ -33,34 +33,37 @@ def run_simulation() -> None:
         option_font = pygame.font.Font(pygame.font.get_default_font(), option_size)
         hint_font = pygame.font.Font(pygame.font.get_default_font(), hint_size)
 
+        # title
         title_surf = title_font.render('Select Simulation:', True, (240, 240, 245))
-        option1_surf = option_font.render('1) BasicSimulation', True, (220, 220, 230))
-        option2_surf = option_font.render('2) GreedySimulation', True, (220, 220, 230))
-        option3_surf = option_font.render('3) inc_food_basic_sim', True, (220, 220, 230))
-        option4_surf = option_font.render('4) inc_food_greedy_sim', True, (220, 220, 230))
-        option5_surf = option_font.render('5) inc_energy_basic_sim', True, (220, 220, 230))
-        option6_surf = option_font.render('6) inc_energy_greedy_sim', True, (220, 220, 230))
-        hint_surf = hint_font.render('Esc to quit | \\ to show chart early', True, (180, 180, 190))
+        # options vary based on mode; caller should pass mode into this function (see draw_mode_menu_local)
+        # if mode == 'standard' show basic/greedy; if 'research' show incremental experiments
+        if mode == 'standard':
+            opts = [
+                option_font.render('1) BasicSimulation', True, (220, 220, 230)),
+                option_font.render('2) GreedySimulation', True, (220, 220, 230)),
+                option_font.render('3) MutationSimulation', True, (220, 220, 230)),
+            ]
+            hint_text = 'Esc to quit'
+        else:
+            opts = [
+                option_font.render('1) inc_food_basic_sim', True, (220, 220, 230)),
+                option_font.render('2) inc_food_greedy_sim', True, (220, 220, 230)),
+                option_font.render('3) inc_energy_basic_sim', True, (220, 220, 230)),
+                option_font.render('4) inc_energy_greedy_sim', True, (220, 220, 230)),
+            ]
+            hint_text = 'Esc to quit'
+
+        hint_surf = hint_font.render(hint_text, True, (180, 180, 190))
 
         # positions centered horizontally, spaced vertically
         y_center = height * 0.35
         spacing = max(8, int(height * 0.05))
         title_pos = (width // 2 - title_surf.get_width() // 2, int(y_center - spacing * 1.5))
-        option1_pos = (width // 2 - option1_surf.get_width() // 2, int(y_center))
-        option2_pos = (width // 2 - option2_surf.get_width() // 2, int(y_center + spacing))
-        option3_pos = (width // 2 - option3_surf.get_width() // 2, int(y_center + spacing * 2))
-        option4_pos = (width // 2 - option4_surf.get_width() // 2, int(y_center + spacing * 3))
-        option5_pos = (width // 2 - option5_surf.get_width() // 2, int(y_center + spacing * 4))
-        option6_pos = (width // 2 - option6_surf.get_width() // 2, int(y_center + spacing * 5))
-        hint_pos = (width // 2 - hint_surf.get_width() // 2, int(y_center + spacing * 6.5))
-
         screen.blit(title_surf, title_pos)
-        screen.blit(option1_surf, option1_pos)
-        screen.blit(option2_surf, option2_pos)
-        screen.blit(option3_surf, option3_pos)
-        screen.blit(option4_surf, option4_pos)
-        screen.blit(option5_surf, option5_pos)
-        screen.blit(option6_surf, option6_pos)
+        for idx, opt_surf in enumerate(opts):
+            pos = (width // 2 - opt_surf.get_width() // 2, int(y_center + spacing * idx))
+            screen.blit(opt_surf, pos)
+        hint_pos = (width // 2 - hint_surf.get_width() // 2, int(y_center + spacing * (len(opts) + 1)))
         screen.blit(hint_surf, hint_pos)
         pygame.display.flip()
 
@@ -100,13 +103,41 @@ def run_simulation() -> None:
             ('Greedy avg population vs food', os.path.join(os.getcwd(), 'log', 'greedy_average_population_vs_food.csv')),
             ('Basic avg population vs energy', os.path.join(os.getcwd(), 'log', 'basic_average_population_vs_energy.csv')),
             ('Greedy avg population vs energy', os.path.join(os.getcwd(), 'log', 'greedy_average_population_vs_energy.csv')),
+            ('Mutation avg speed vs day', os.path.join(os.getcwd(), 'log', 'mutation_simulation_speed_vs_day.csv')),
         ]
         idx = 0
         while True:
             screen.fill(BACKGROUND_COLOR)
             # draw selected CSV graph
             title, path = files[idx]
-            render_csv_graph(screen, path)
+            base_name = os.path.basename(path).lower()
+            # If this is a mutation speed CSV, parse and render with render_speed_graph
+            if 'speed' in base_name:
+                speed_rows = []
+                if os.path.exists(path):
+                    try:
+                        with open(path, 'r', newline='') as f:
+                            reader = csv.reader(f)
+                            header = next(reader, None)
+                            for r in reader:
+                                try:
+                                    day = int(r[0])
+                                    avg = float(r[1])
+                                except Exception:
+                                    continue
+                                speed_rows.append((day, avg))
+                    except Exception:
+                        speed_rows = []
+                # normalize days to 1..N for display (in case CSV contains absolute day counters)
+                if speed_rows:
+                    min_day = min(d for d, _ in speed_rows)
+                    speed_rows = [(d - min_day + 1, a) for d, a in speed_rows]
+                else:
+                    speed_rows = []
+                # render full CSV (not just a truncated tail)
+                render_speed_graph(screen, speed_rows)
+            else:
+                render_csv_graph(screen, path)
             # draw footer text
             font = pygame.font.SysFont(None, 18)
             info = font.render(f'{title} | Left/Right to switch | Esc to return', True, (200, 200, 210))
@@ -134,9 +165,43 @@ def run_simulation() -> None:
         if choice == 'run':
             break
 
+    # mode selection: standard vs research
+    def draw_mode_menu_local() -> str:
+        # returns 'standard' or 'research'
+        while True:
+            screen.fill(BACKGROUND_COLOR)
+            width, height = screen.get_size()
+            pygame.draw.rect(screen, EDGE_COLOR, pygame.Rect(0, 0, width, height), width=2)
+            title_font = pygame.font.Font(pygame.font.get_default_font(), max(14, int(height * 0.05)))
+            opt_font = pygame.font.Font(pygame.font.get_default_font(), max(12, int(height * 0.04)))
+            title = title_font.render('Select Mode', True, (240, 240, 245))
+            opt1 = opt_font.render('1) standard - run Basic/Greedy simulations', True, (220, 220, 230))
+            opt2 = opt_font.render('2) research - run incremental experiments', True, (220, 220, 230))
+            screen.blit(title, (width // 2 - title.get_width() // 2, int(height * 0.25)))
+            screen.blit(opt1, (width // 2 - opt1.get_width() // 2, int(height * 0.4)))
+            screen.blit(opt2, (width // 2 - opt2.get_width() // 2, int(height * 0.47)))
+            hint = opt_font.render('Press 1 or 2 | Esc to quit', True, (160, 160, 170))
+            screen.blit(hint, (width // 2 - hint.get_width() // 2, int(height * 0.54)))
+            pygame.display.flip()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit(0)
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_1:
+                        return 'standard'
+                    if event.key == pygame.K_2:
+                        return 'research'
+                    if event.key == pygame.K_ESCAPE:
+                        pygame.quit()
+                        sys.exit(0)
+            clock.tick(30)
+
+    mode = draw_mode_menu_local()
+
     selected = None
     while selected is None:
-        draw_menu()
+        draw_menu(mode)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -145,18 +210,23 @@ def run_simulation() -> None:
                 if event.key == pygame.K_ESCAPE:
                     pygame.quit()
                     sys.exit(0)
-                if event.key == pygame.K_1:
-                    selected = 'BasicSimulation'
-                if event.key == pygame.K_2:
-                    selected = 'GreedySimulation'
-                if event.key == pygame.K_3:
-                    selected = 'inc_food_basic_sim'
-                if event.key == pygame.K_4:
-                    selected = 'inc_food_greedy_sim'
-                if event.key == pygame.K_5:
-                    selected = 'inc_energy_basic_sim'
-                if event.key == pygame.K_6:
-                    selected = 'inc_energy_greedy_sim'
+                # Map keys to selections based on mode
+                if mode == 'standard':
+                    if event.key == pygame.K_1:
+                        selected = 'BasicSimulation'
+                    if event.key == pygame.K_2:
+                        selected = 'GreedySimulation'
+                    if event.key == pygame.K_3:
+                        selected = 'MutationSimulation'
+                else:  # research
+                    if event.key == pygame.K_1:
+                        selected = 'inc_food_basic_sim'
+                    if event.key == pygame.K_2:
+                        selected = 'inc_food_greedy_sim'
+                    if event.key == pygame.K_3:
+                        selected = 'inc_energy_basic_sim'
+                    if event.key == pygame.K_4:
+                        selected = 'inc_energy_greedy_sim'
         clock.tick(30)
     # after selecting simulation type, ask whether food should scale with population
     def draw_scale_menu() -> None:
@@ -348,7 +418,7 @@ def run_simulation() -> None:
                     creature.draw(screen)
                 for food in sim.foods:
                     food.draw(screen)
-                render_population_graph(screen, day_rows[-20:])
+                render_population_graph(screen, day_rows)
                 pygame.display.flip()
                 base_delay_ms = 5000
                 delay_ms = max(500, base_delay_ms // max(1, sim.speed_steps))
@@ -431,7 +501,7 @@ def run_simulation() -> None:
                     creature.draw(screen)
                 for food in sim.foods:
                     food.draw(screen)
-                render_population_graph(screen, day_rows[-20:])
+                render_population_graph(screen, day_rows)
                 pygame.display.flip()
                 base_delay_ms = 5000
                 delay_ms = max(500, base_delay_ms // max(1, sim.speed_steps))
@@ -452,10 +522,17 @@ def run_simulation() -> None:
                 run_idx += 1
 
             # (never reached)
+        # prepare per-simulation auxiliary storage
+        speed_rows = []
+
         if selected == 'BasicSimulation':
             sim = BasicSimulation(WORLD_WIDTH, WORLD_HEIGHT)
         elif selected == 'GreedySimulation':
             sim = GreedySimulation(WORLD_WIDTH, WORLD_HEIGHT)
+        elif selected == 'MutationSimulation':
+            sim = MutationSimulation(WORLD_WIDTH, WORLD_HEIGHT)
+            # prepare storage for average-speed-per-day measurements
+            speed_rows: list = []
         else:
             sim = BasicSimulation(WORLD_WIDTH, WORLD_HEIGHT)
 
@@ -470,13 +547,28 @@ def run_simulation() -> None:
         pygame.display.set_caption(f'Ecosystem Simulator – {selected} (x{sim.speed_steps})')
 
         day = 0
-        # collect per-day stats for graphing and recent CSV. Keep all days; graph will show last 20.
+        # collect per-day stats for graphing and recent CSV. Keep all days; graph will show full dataset.
         day_rows = []  # list of (day, start, food, survivors, died, end)
         while True:
             if len(sim.creatures) == 0:
                 break
             day += 1
             sim.day = day
+            # For mutation simulation, measure average speed at start of day
+            if selected == 'MutationSimulation':
+                # copy speeds from current creatures (start of day)
+                try:
+                    avg_speed = 0.0
+                    if sim.creatures:
+                        avg_speed = sum(float(getattr(c, 'traits', {}).get('speed', 1.0)) for c in sim.creatures) / len(sim.creatures)
+                    else:
+                        avg_speed = 0.0
+                except Exception:
+                    avg_speed = 0.0
+                # record in separate speed_rows list
+                if 'speed_rows' not in locals():
+                    speed_rows = []
+                speed_rows.append((day, avg_speed))
 
             start_creatures, food_spawned, survivors, died = sim.simulate_day(screen, clock)
             current_speed_steps = sim.speed_steps
@@ -493,9 +585,28 @@ def run_simulation() -> None:
                     creature.draw(screen)
                 for food in sim.foods:
                     food.draw(screen)
-                # Also render a simple graph of population vs day (start-of-day population)
-                # Render only the most recent 20 days for clarity
-                render_population_graph(screen, day_rows[-20:])
+                # Render results: for mutation sim show average speed vs day
+                if selected == 'MutationSimulation':
+                    # ensure speed_rows exists; show the full recorded run rather than only the last 20 days
+                    speed_rows_to_show = speed_rows if 'speed_rows' in locals() else []
+                    render_speed_graph(screen, speed_rows_to_show)
+                    # write most recent run CSV for mutation simulation
+                    log_dir = os.path.join(os.getcwd(), 'log')
+                    os.makedirs(log_dir, exist_ok=True)
+                    mpath = os.path.join(log_dir, 'mutation_simulation_speed_vs_day.csv')
+                    with open(mpath, 'w', newline='') as f:
+                        w = csv.writer(f)
+                        w.writerow(['day', 'average_speed'])
+                        # write day indices starting at 1 so CSV is self-contained and viewer shows 1..N
+                        for idx, r in enumerate((speed_rows if 'speed_rows' in locals() else []), start=1):
+                            try:
+                                w.writerow([int(idx), float(r[1])])
+                            except Exception:
+                                continue
+                else:
+                    # Also render a simple graph of population vs day (start-of-day population)
+                    # Render only the most recent 20 days for clarity
+                    render_population_graph(screen, day_rows[-20:])
                 pygame.display.flip()
                 # Increase base delay to 5000ms and scale with speed
                 base_delay_ms = 5000
@@ -628,6 +739,176 @@ def render_population_graph(screen: pygame.Surface, day_rows: list) -> None:
         label_day = int(min_day + i / max(1, tick_count - 1) * (max_day - min_day))
         lbl = font.render(str(label_day), True, (160, 160, 170))
         screen.blit(lbl, (int(tx) - lbl.get_width() // 2, graph_rect.bottom + 6))
+
+
+def render_speed_graph(screen: pygame.Surface, day_rows: list) -> None:
+    """Render a graph of average speed vs day.
+    Expects day_rows as list of tuples where the second element is the average speed (float).
+    """
+    width = screen.get_width()
+    height = screen.get_height()
+    original_margin = 40
+    original_graph_width = width - 2 * original_margin
+    original_graph_height = height - 2 * original_margin
+    new_graph_width = int(0.75 * original_graph_width)
+    new_graph_height = int(0.75 * original_graph_height)
+    margin_x = (width - new_graph_width) // 2
+    margin_y = (height - new_graph_height) // 2
+    graph_rect = pygame.Rect(margin_x, margin_y, new_graph_width, new_graph_height)
+
+    pygame.draw.rect(screen, EDGE_COLOR, graph_rect, width=1)
+    if not day_rows:
+        return
+    days = [row[0] for row in day_rows]
+    speeds = [row[1] for row in day_rows]
+    min_day = min(days)
+    max_day = max(days)
+    max_speed = max(max(speeds), 1.0)
+    display_max_speed = max_speed * SIM_GRAPH_Y_MARGIN
+
+    # Build pixel positions for raw data points
+    points = []
+    n = len(speeds)
+    for (d, s) in zip(days, speeds):
+        if max_day == min_day:
+            x = graph_rect.left + graph_rect.width / 2
+        else:
+            x = graph_rect.left + (d - min_day) / max(1, (max_day - min_day)) * graph_rect.width
+        y = graph_rect.bottom - (s / display_max_speed) * graph_rect.height
+        points.append((int(x), int(y)))
+
+    # Adaptive smoothing window: larger for longer series to reduce volatility
+    # window is at least 3, grows to ~n/10, capped at 51
+    window = max(3, min(51, max(3, n // 10)))
+    if n < window:
+        window = max(1, n)
+    half = window // 2
+
+    # Centered moving average smoothing
+    smoothed = []
+    for i in range(n):
+        start = max(0, i - half)
+        end = min(n, i + half + 1)
+        avg = sum(speeds[start:end]) / float(end - start)
+        smoothed.append(avg)
+
+    # To create a clean (but now sparser) trend curve, aggregate the smoothed series
+    # into a modest number of segments and draw lines between segment means.
+    # Reducing max_segments reduces visual clutter and makes the trend easier to read.
+    max_segments = 20  # was 60, reduce to draw fewer piecewise segments
+    segments = min(max_segments, max(1, n))
+    seg_size = max(1, n // segments)
+    agg_days = []
+    agg_vals = []
+    i = 0
+    while i < n:
+        chunk = range(i, min(n, i + seg_size))
+        chunk_days = [days[j] for j in chunk]
+        chunk_vals = [smoothed[j] for j in chunk]
+        if chunk_days:
+            agg_days.append(sum(chunk_days) / len(chunk_days))
+            agg_vals.append(sum(chunk_vals) / len(chunk_vals))
+        i += seg_size
+
+    # Build pixel positions for aggregated trend points
+    agg_points = []
+    for (d, s) in zip(agg_days, agg_vals):
+        if max_day == min_day:
+            x = graph_rect.left + graph_rect.width / 2
+        else:
+            x = graph_rect.left + (d - min_day) / max(1, (max_day - min_day)) * graph_rect.width
+        y = graph_rect.bottom - (s / display_max_speed) * graph_rect.height
+        agg_points.append((int(x), int(y)))
+
+    # Draw raw points faintly (small grey dots) so trend stands out
+    raw_color = (180, 180, 190)
+    for p in points:
+        pygame.draw.circle(screen, raw_color, p, 2)
+
+    # Draw aggregated piecewise trend: many short line segments (thin, darker)
+    # Use blue for the piecewise segments so it contrasts with the smoothed curve.
+    agg_color = (60, 120, 200)  # blue
+    if len(agg_points) >= 2:
+        pygame.draw.lines(screen, agg_color, False, agg_points, 2)
+    elif len(agg_points) == 1:
+        pygame.draw.circle(screen, agg_color, agg_points[0], 3)
+
+    # Also draw a heavier smoothed line through a down-sampled set of smoothed points
+    # to avoid drawing one line per day (which looks noisy for long runs).
+    smooth_sample_max = 40
+    sample_step = max(1, n // smooth_sample_max)
+    sampled_days = days[::sample_step]
+    sampled_smoothed = smoothed[::sample_step]
+    # Ensure the final datapoint is included so the curve reaches the run end
+    if sampled_days and sampled_days[-1] != days[-1]:
+        sampled_days.append(days[-1])
+        sampled_smoothed.append(smoothed[-1])
+
+    smooth_points = []
+    for (d, s) in zip(sampled_days, sampled_smoothed):
+        if max_day == min_day:
+            x = graph_rect.left + graph_rect.width / 2
+        else:
+            x = graph_rect.left + (d - min_day) / max(1, (max_day - min_day)) * graph_rect.width
+        y = graph_rect.bottom - (s / display_max_speed) * graph_rect.height
+        smooth_points.append((int(x), int(y)))
+    # Draw the down-sampled smoothed curve in red so it stands out as the primary trend.
+    smooth_color = (200, 60, 60)  # red
+    if len(smooth_points) >= 2:
+        pygame.draw.lines(screen, smooth_color, False, smooth_points, 3)
+    elif len(smooth_points) == 1:
+        pygame.draw.circle(screen, smooth_color, smooth_points[0], 4)
+
+    font = pygame.font.SysFont(None, 18)
+    label = font.render('Average Speed vs Day (start of day)', True, (200, 200, 210))
+    screen.blit(label, (graph_rect.left, graph_rect.top - 22))
+
+    # day labels
+    d_min_label = font.render(str(min_day), True, (160, 160, 170))
+    d_max_label = font.render(str(max_day), True, (160, 160, 170))
+    screen.blit(d_min_label, (graph_rect.left - 5, graph_rect.bottom + 4))
+    screen.blit(d_max_label, (graph_rect.right - d_max_label.get_width(), graph_rect.bottom + 4))
+
+    # y labels: 0, mid, max
+    y0 = font.render('0', True, (160, 160, 170))
+    y_mid_val = int(max_speed / 2)
+    y_mid = font.render(str(y_mid_val), True, (160, 160, 170))
+    y_max = font.render(str(int(max_speed)), True, (160, 160, 170))
+    screen.blit(y0, (graph_rect.left - 18, graph_rect.bottom - 8))
+    screen.blit(y_mid, (graph_rect.left - 28, int(graph_rect.top + graph_rect.height / 2) - 8))
+    screen.blit(y_max, (graph_rect.left - 30, graph_rect.top - 8))
+
+    axis_color = (180, 180, 190)
+    # draw middle tick only for Y
+    pygame.draw.line(screen, axis_color, (graph_rect.left - 6, int(graph_rect.top + graph_rect.height / 2)), (graph_rect.left, int(graph_rect.top + graph_rect.height / 2)), 1)
+    # draw X ticks
+    tick_count = min(5, max(2, max_day - min_day + 1))
+    for i in range(tick_count):
+        tx = graph_rect.left + i / max(1, tick_count - 1) * graph_rect.width
+        if i not in (0, tick_count - 1):
+            pygame.draw.line(screen, axis_color, (int(tx), graph_rect.bottom), (int(tx), graph_rect.bottom + 6), 1)
+        label_day = int(min_day + i / max(1, tick_count - 1) * (max_day - min_day))
+        lbl = font.render(str(label_day), True, (160, 160, 170))
+        screen.blit(lbl, (int(tx) - lbl.get_width() // 2, graph_rect.bottom + 6))
+
+    # compute overall average speed across the whole series and display it outside the graph
+    # Compute overall average using only the last 90% of recorded values to allow stabilization
+    overall_avg = 0.0
+    try:
+        if speeds:
+            n = len(speeds)
+            start_idx = int(n * 0.1)
+            tail = speeds[start_idx:]
+            if not tail:
+                tail = speeds
+            overall_avg = sum(tail) / float(len(tail))
+    except Exception:
+        overall_avg = 0.0
+    avg_text = font.render(f'Overall avg speed: {overall_avg:.2f}', True, (220, 220, 210))
+    # place at top-right corner but keep within window bounds
+    tx = min(graph_rect.right + 8, screen.get_width() - avg_text.get_width() - 8)
+    ty = max(8, graph_rect.top - 20)
+    screen.blit(avg_text, (tx, ty))
 
 
 def render_csv_graph(screen: pygame.Surface, csv_path: str) -> None:
