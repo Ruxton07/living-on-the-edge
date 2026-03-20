@@ -3,7 +3,7 @@ import os
 import csv
 import pygame
 
-from constants import WORLD_WIDTH, WORLD_HEIGHT, BACKGROUND_COLOR, EDGE_COLOR, SIM_GRAPH_Y_MARGIN, DATA_SIM_RUNS, DATA_SIM_ENERGY_START, DATA_SIM_ENERGY_INCREMENT
+from constants import WORLD_WIDTH, WORLD_HEIGHT, BACKGROUND_COLOR, EDGE_COLOR, SIM_GRAPH_Y_MARGIN, DATA_SIM_RUNS, DATA_SIM_ENERGY_START, DATA_SIM_ENERGY_INCREMENT, MUTATION_SPEED_DELTA, MUTATION_SIZE_DELTA, MUTATION_INTELLIGENCE_DELTA
 from basic_simulation import BasicSimulation
 from greedy_simulation import GreedySimulation
 from mutation_simulation import MutationSimulation
@@ -18,6 +18,21 @@ def run_simulation() -> None:
     screen = pygame.display.set_mode((WORLD_WIDTH, WORLD_HEIGHT), pygame.SCALED | pygame.RESIZABLE)
     pygame.display.set_caption('Ecosystem Simulator – Select Simulation')
     clock = pygame.time.Clock()
+
+    def wait_for_results_dismiss(draw_results) -> None:
+        while True:
+            draw_results()
+            font = pygame.font.SysFont(None, 18)
+            info = font.render("Press \\ to continue", True, (200, 200, 210))
+            screen.blit(info, (10, screen.get_height() - 24))
+            pygame.display.flip()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit(0)
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_BACKSLASH:
+                    return
+            clock.tick(30)
 
     def draw_menu(mode: str) -> None:
         # dynamically size menu based on current window size to avoid cutoff
@@ -103,7 +118,7 @@ def run_simulation() -> None:
             ('Greedy avg population vs food', os.path.join(os.getcwd(), 'log', 'greedy_average_population_vs_food.csv')),
             ('Basic avg population vs energy', os.path.join(os.getcwd(), 'log', 'basic_average_population_vs_energy.csv')),
             ('Greedy avg population vs energy', os.path.join(os.getcwd(), 'log', 'greedy_average_population_vs_energy.csv')),
-            ('Mutation avg speed vs day', os.path.join(os.getcwd(), 'log', 'mutation_simulation_speed_vs_day.csv')),
+            ('Mutation traits vs day', os.path.join(os.getcwd(), 'log', 'mutation_simulation_traits.csv')),
         ]
         idx = 0
         while True:
@@ -111,31 +126,9 @@ def run_simulation() -> None:
             # draw selected CSV graph
             title, path = files[idx]
             base_name = os.path.basename(path).lower()
-            # If this is a mutation speed CSV, parse and render with render_speed_graph
-            if 'speed' in base_name:
-                speed_rows = []
-                if os.path.exists(path):
-                    try:
-                        with open(path, 'r', newline='') as f:
-                            reader = csv.reader(f)
-                            header = next(reader, None)
-                            for r in reader:
-                                try:
-                                    day = int(r[0])
-                                    avg = float(r[1])
-                                except Exception:
-                                    continue
-                                speed_rows.append((day, avg))
-                    except Exception:
-                        speed_rows = []
-                # normalize days to 1..N for display (in case CSV contains absolute day counters)
-                if speed_rows:
-                    min_day = min(d for d, _ in speed_rows)
-                    speed_rows = [(d - min_day + 1, a) for d, a in speed_rows]
-                else:
-                    speed_rows = []
-                # render full CSV (not just a truncated tail)
-                render_speed_graph(screen, speed_rows)
+            # If this is a mutation traits CSV, parse and render multiple graphs
+            if 'mutation' in base_name and 'traits' in base_name:
+                render_mutation_traits_graphs(screen, path)
             else:
                 render_csv_graph(screen, path)
             # draw footer text
@@ -175,7 +168,7 @@ def run_simulation() -> None:
             title_font = pygame.font.Font(pygame.font.get_default_font(), max(14, int(height * 0.05)))
             opt_font = pygame.font.Font(pygame.font.get_default_font(), max(12, int(height * 0.04)))
             title = title_font.render('Select Mode', True, (240, 240, 245))
-            opt1 = opt_font.render('1) standard - run Basic/Greedy simulations', True, (220, 220, 230))
+            opt1 = opt_font.render('1) standard - run static simulations', True, (220, 220, 230))
             opt2 = opt_font.render('2) research - run incremental experiments', True, (220, 220, 230))
             screen.blit(title, (width // 2 - title.get_width() // 2, int(height * 0.25)))
             screen.blit(opt1, (width // 2 - opt1.get_width() // 2, int(height * 0.4)))
@@ -220,13 +213,13 @@ def run_simulation() -> None:
                         selected = 'MutationSimulation'
                 else:  # research
                     if event.key == pygame.K_1:
-                        selected = 'inc_food_basic_sim'
+                        selected = 'Incremental Food (Basic)'
                     if event.key == pygame.K_2:
-                        selected = 'inc_food_greedy_sim'
+                        selected = 'Incremental Food (Greedy)'
                     if event.key == pygame.K_3:
-                        selected = 'inc_energy_basic_sim'
+                        selected = 'Incremental Energy (Basic)'
                     if event.key == pygame.K_4:
-                        selected = 'inc_energy_greedy_sim'
+                        selected = 'Incremental Energy (Greedy)'
         clock.tick(30)
     # after selecting simulation type, ask whether food should scale with population
     def draw_scale_menu() -> None:
@@ -290,7 +283,7 @@ def run_simulation() -> None:
     scale_food = None
     fixed_food_amount = None
     # if an incremental-food or incremental-energy sim was selected, skip scale prompt and ask for a starting fixed food
-    if selected in ('inc_food_basic_sim', 'inc_food_greedy_sim', 'inc_energy_basic_sim', 'inc_energy_greedy_sim'):
+    if selected in ('Incremental Food (Basic)', 'Incremental Food (Greedy)', 'Incremental Energy (Basic)', 'Incremental Energy (Greedy)'):
         # ask for starting food amount (default 5)
         fixed_food_amount = prompt_fixed_amount(initial=5)
         scale_food = False
@@ -315,7 +308,7 @@ def run_simulation() -> None:
                         break
             clock.tick(30)
 
-    if scale_food is False and selected not in ('inc_food_basic_sim', 'inc_food_greedy_sim'):
+    if scale_food is False and selected not in ('Incremental Food (Basic)', 'Incremental Food (Greedy)'):
         # ask for fixed food amount (default 5)
         fixed_food_amount = prompt_fixed_amount(initial=5)
 
@@ -338,6 +331,58 @@ def run_simulation() -> None:
         screen.blit(hint, (width // 2 - hint.get_width() // 2, int(height * 0.52)))
         pygame.display.flip()
 
+    def draw_mutation_toggle_menu(initial_speed: bool = True, initial_size: bool = True, initial_intelligence: bool = True) -> dict:
+        """Interactive menu to toggle mutation types on/off for MutationSimulation.
+
+        Returns a dict like {'speed': bool, 'size': bool, 'intelligence': bool}.
+        """
+        speed_on = bool(initial_speed)
+        size_on = bool(initial_size)
+        intelligence_on = bool(initial_intelligence)
+        while True:
+            screen.fill(BACKGROUND_COLOR)
+            width, height = screen.get_size()
+            pygame.draw.rect(screen, EDGE_COLOR, pygame.Rect(0, 0, width, height), width=2)
+            title_size = max(14, int(height * 0.05))
+            option_size = max(12, int(height * 0.04))
+            hint_size = max(10, int(height * 0.03))
+            title_font = pygame.font.Font(pygame.font.get_default_font(), title_size)
+            option_font = pygame.font.Font(pygame.font.get_default_font(), option_size)
+            hint_font = pygame.font.Font(pygame.font.get_default_font(), hint_size)
+
+            title = title_font.render('Mutation toggles', True, (240, 240, 245))
+            speed_label = f"Speed mutation: {'ON' if speed_on else 'OFF'} (±{int(MUTATION_SPEED_DELTA * 100)}%)"
+            size_label = f"Size mutation: {'ON' if size_on else 'OFF'} (±{int(MUTATION_SIZE_DELTA * 100)}%)"
+            intelligence_label = f"Intelligence mutation: {'ON' if intelligence_on else 'OFF'} (±{int(MUTATION_INTELLIGENCE_DELTA * 100)}%)"
+            opt_speed = option_font.render('S) ' + speed_label, True, (220, 220, 230))
+            opt_size = option_font.render('Z) ' + size_label, True, (220, 220, 230))
+            opt_intelligence = option_font.render('I) ' + intelligence_label, True, (220, 220, 230))
+            hint = hint_font.render('Press S/Z/I to toggle | Enter to continue | Esc to cancel', True, (160, 160, 170))
+
+            screen.blit(title, (width // 2 - title.get_width() // 2, int(height * 0.3)))
+            screen.blit(opt_speed, (width // 2 - opt_speed.get_width() // 2, int(height * 0.4)))
+            screen.blit(opt_size, (width // 2 - opt_size.get_width() // 2, int(height * 0.47)))
+            screen.blit(opt_intelligence, (width // 2 - opt_intelligence.get_width() // 2, int(height * 0.54)))
+            screen.blit(hint, (width // 2 - hint.get_width() // 2, int(height * 0.63)))
+            pygame.display.flip()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit(0)
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        return {'speed': speed_on, 'size': size_on, 'intelligence': intelligence_on}
+                    if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                        return {'speed': speed_on, 'size': size_on, 'intelligence': intelligence_on}
+                    if event.key == pygame.K_s:
+                        speed_on = not speed_on
+                    if event.key == pygame.K_z:
+                        size_on = not size_on
+                    if event.key == pygame.K_i:
+                        intelligence_on = not intelligence_on
+            clock.tick(30)
+
     verbose_choice = None
     while verbose_choice is None:
         draw_verbose_menu()
@@ -355,17 +400,22 @@ def run_simulation() -> None:
                     verbose_choice = False
         clock.tick(30)
 
+    # If mutation simulation is selected, allow toggling individual mutations
+    mutation_settings = {'speed': True, 'size': True, 'intelligence': True}
+    if selected == 'MutationSimulation':
+        mutation_settings = draw_mutation_toggle_menu()
+
     pygame.display.set_caption(f'Ecosystem Simulator – {selected}')
     simulation_id = 1
     current_speed_steps = 1
     while True:
         # for incremental-food sims we will run a sequence of simulations (50 runs)
-        if selected in ('inc_food_basic_sim', 'inc_food_greedy_sim'):
+        if selected in ('Incremental Food (Basic)', 'Incremental Food (Greedy)'):
             # starting food is fixed_food_amount
             start_food = fixed_food_amount if isinstance(fixed_food_amount, int) else 5
             runs = DATA_SIM_RUNS
             # determine CSV path base name
-            if selected == 'inc_food_basic_sim':
+            if selected == 'Incremental Food (Basic)':
                 avg_csv_name = 'basic_average_population_vs_food.csv'
                 sim_factory = BasicSimulation
             else:
@@ -411,19 +461,18 @@ def run_simulation() -> None:
                     if getattr(sim, 'manual_stop', False):
                         break
 
-                # at end of 50-day run (or earlier if manual_stop), show final frame and write recent CSV
-                screen.fill(BACKGROUND_COLOR)
-                pygame.draw.rect(screen, EDGE_COLOR, pygame.Rect(0, 0, sim.width, sim.height), width=2)
-                for creature in sim.creatures:
-                    creature.draw(screen)
-                for food in sim.foods:
-                    food.draw(screen)
-                render_population_graph(screen, day_rows)
-                pygame.display.flip()
-                base_delay_ms = 5000
-                delay_ms = max(500, base_delay_ms // max(1, sim.speed_steps))
+                # at end of 50-day run (or earlier if manual_stop), show final frame until dismissed
+                def draw_incremental_food_results() -> None:
+                    screen.fill(BACKGROUND_COLOR)
+                    pygame.draw.rect(screen, EDGE_COLOR, pygame.Rect(0, 0, sim.width, sim.height), width=2)
+                    for creature in sim.creatures:
+                        creature.draw(screen)
+                    for food in sim.foods:
+                        food.draw(screen)
+                    render_population_graph(screen, day_rows)
+
                 write_recent_csv(simulation_id, day_rows)
-                pygame.time.delay(delay_ms)
+                wait_for_results_dismiss(draw_incremental_food_results)
 
                 # after the run, compute average population (average start_creatures per day)
                 if day_rows:
@@ -442,11 +491,11 @@ def run_simulation() -> None:
 
             # (never reached) continue
         # energy-based incremental sims: vary creature max energy per run and record average population
-        if selected in ('inc_energy_basic_sim', 'inc_energy_greedy_sim'):
+        if selected in ('Incremental Energy (Basic)', 'Incremental Energy (Greedy)'):
             start_energy = DATA_SIM_ENERGY_START
             energy_increment = DATA_SIM_ENERGY_INCREMENT
             runs = DATA_SIM_RUNS
-            if selected == 'inc_energy_basic_sim':
+            if selected == 'Incremental Energy (Basic)':
                 avg_csv_name = 'basic_average_population_vs_energy.csv'
                 sim_factory = BasicSimulation
             else:
@@ -495,18 +544,17 @@ def run_simulation() -> None:
                     if getattr(sim, 'manual_stop', False):
                         break
 
-                screen.fill(BACKGROUND_COLOR)
-                pygame.draw.rect(screen, EDGE_COLOR, pygame.Rect(0, 0, sim.width, sim.height), width=2)
-                for creature in sim.creatures:
-                    creature.draw(screen)
-                for food in sim.foods:
-                    food.draw(screen)
-                render_population_graph(screen, day_rows)
-                pygame.display.flip()
-                base_delay_ms = 5000
-                delay_ms = max(500, base_delay_ms // max(1, sim.speed_steps))
+                def draw_incremental_energy_results() -> None:
+                    screen.fill(BACKGROUND_COLOR)
+                    pygame.draw.rect(screen, EDGE_COLOR, pygame.Rect(0, 0, sim.width, sim.height), width=2)
+                    for creature in sim.creatures:
+                        creature.draw(screen)
+                    for food in sim.foods:
+                        food.draw(screen)
+                    render_population_graph(screen, day_rows)
+
                 write_recent_csv(simulation_id, day_rows)
-                pygame.time.delay(delay_ms)
+                wait_for_results_dismiss(draw_incremental_energy_results)
 
                 # compute average population for the run
                 if day_rows:
@@ -524,15 +572,25 @@ def run_simulation() -> None:
             # (never reached)
         # prepare per-simulation auxiliary storage
         speed_rows = []
+        size_rows = []
+        intelligence_rows = []
 
         if selected == 'BasicSimulation':
             sim = BasicSimulation(WORLD_WIDTH, WORLD_HEIGHT)
         elif selected == 'GreedySimulation':
             sim = GreedySimulation(WORLD_WIDTH, WORLD_HEIGHT)
         elif selected == 'MutationSimulation':
-            sim = MutationSimulation(WORLD_WIDTH, WORLD_HEIGHT)
-            # prepare storage for average-speed-per-day measurements
-            speed_rows: list = []
+            sim = MutationSimulation(
+                WORLD_WIDTH,
+                WORLD_HEIGHT,
+                mutation_speed_enabled=mutation_settings.get('speed', True),
+                mutation_size_enabled=mutation_settings.get('size', True),
+                mutation_intelligence_enabled=mutation_settings.get('intelligence', True),
+            )
+            # prepare storage for average-trait-per-day measurements
+            speed_rows = []
+            size_rows = []
+            intelligence_rows = []
         else:
             sim = BasicSimulation(WORLD_WIDTH, WORLD_HEIGHT)
 
@@ -554,21 +612,27 @@ def run_simulation() -> None:
                 break
             day += 1
             sim.day = day
-            # For mutation simulation, measure average speed at start of day
+            # For mutation simulation, measure average traits at start of day
             if selected == 'MutationSimulation':
-                # copy speeds from current creatures (start of day)
                 try:
                     avg_speed = 0.0
+                    avg_size = 0.0
+                    avg_intelligence = 0.0
                     if sim.creatures:
                         avg_speed = sum(float(getattr(c, 'traits', {}).get('speed', 1.0)) for c in sim.creatures) / len(sim.creatures)
+                        avg_size = sum(float(getattr(c, 'traits', {}).get('size', 1.0)) for c in sim.creatures) / len(sim.creatures)
+                        avg_intelligence = sum(float(getattr(c, 'traits', {}).get('intelligence', 1.0)) for c in sim.creatures) / len(sim.creatures)
                     else:
                         avg_speed = 0.0
+                        avg_size = 0.0
+                        avg_intelligence = 0.0
                 except Exception:
                     avg_speed = 0.0
-                # record in separate speed_rows list
-                if 'speed_rows' not in locals():
-                    speed_rows = []
+                    avg_size = 0.0
+                    avg_intelligence = 0.0
                 speed_rows.append((day, avg_speed))
+                size_rows.append((day, avg_size))
+                intelligence_rows.append((day, avg_intelligence))
 
             start_creatures, food_spawned, survivors, died = sim.simulate_day(screen, clock)
             current_speed_steps = sim.speed_steps
@@ -579,41 +643,61 @@ def run_simulation() -> None:
 
             # Stop conditions: extinction or manual stop
             if survivors == 0 or getattr(sim, 'manual_stop', False):
-                screen.fill(BACKGROUND_COLOR)
-                pygame.draw.rect(screen, EDGE_COLOR, pygame.Rect(0, 0, sim.width, sim.height), width=2)
-                for creature in sim.creatures:
-                    creature.draw(screen)
-                for food in sim.foods:
-                    food.draw(screen)
-                # Render results: for mutation sim show average speed vs day
+                mpath = None
                 if selected == 'MutationSimulation':
-                    # ensure speed_rows exists; show the full recorded run rather than only the last 20 days
-                    speed_rows_to_show = speed_rows if 'speed_rows' in locals() else []
-                    render_speed_graph(screen, speed_rows_to_show)
-                    # write most recent run CSV for mutation simulation
+                    # write combined CSV for mutation simulation
                     log_dir = os.path.join(os.getcwd(), 'log')
                     os.makedirs(log_dir, exist_ok=True)
-                    mpath = os.path.join(log_dir, 'mutation_simulation_speed_vs_day.csv')
+                    speed_rows_to_write = speed_rows
+                    size_rows_to_write = size_rows
+                    intelligence_rows_to_write = intelligence_rows
+
+                    # determine which columns to include based on enabled mutations
+                    speed_enabled = mutation_settings.get('speed', True)
+                    size_enabled = mutation_settings.get('size', True)
+                    intelligence_enabled = mutation_settings.get('intelligence', True)
+
+                    mpath = os.path.join(log_dir, 'mutation_simulation_traits.csv')
                     with open(mpath, 'w', newline='') as f:
                         w = csv.writer(f)
-                        w.writerow(['day', 'average_speed'])
-                        # write day indices starting at 1 so CSV is self-contained and viewer shows 1..N
-                        for idx, r in enumerate((speed_rows if 'speed_rows' in locals() else []), start=1):
-                            try:
-                                w.writerow([int(idx), float(r[1])])
-                            except Exception:
-                                continue
-                else:
-                    # Also render a simple graph of population vs day (start-of-day population)
-                    # Render only the most recent 20 days for clarity
-                    render_population_graph(screen, day_rows[-20:])
-                pygame.display.flip()
-                # Increase base delay to 5000ms and scale with speed
-                base_delay_ms = 5000
-                delay_ms = max(500, base_delay_ms // max(1, sim.speed_steps))
+                        # build header dynamically
+                        header = ['day']
+                        if speed_enabled:
+                            header.append('average_speed')
+                        if size_enabled:
+                            header.append('average_size')
+                        if intelligence_enabled:
+                            header.append('average_intelligence')
+                        w.writerow(header)
+
+                        # write data rows
+                        max_days = max(len(speed_rows_to_write), len(size_rows_to_write), len(intelligence_rows_to_write), 0)
+                        for idx in range(max_days):
+                            row: list = [idx + 1]  # day starts at 1
+                            if speed_enabled and idx < len(speed_rows_to_write):
+                                row.append(speed_rows_to_write[idx][1])
+                            if size_enabled and idx < len(size_rows_to_write):
+                                row.append(size_rows_to_write[idx][1])
+                            if intelligence_enabled and idx < len(intelligence_rows_to_write):
+                                row.append(intelligence_rows_to_write[idx][1])
+                            w.writerow(row)
+
+                def draw_final_results() -> None:
+                    screen.fill(BACKGROUND_COLOR)
+                    pygame.draw.rect(screen, EDGE_COLOR, pygame.Rect(0, 0, sim.width, sim.height), width=2)
+                    for creature in sim.creatures:
+                        creature.draw(screen)
+                    for food in sim.foods:
+                        food.draw(screen)
+                    if selected == 'MutationSimulation' and mpath is not None:
+                        render_mutation_traits_graphs(screen, mpath)
+                    else:
+                        # Render only the most recent 20 days for clarity
+                        render_population_graph(screen, day_rows[-20:])
+
                 # Write/update recent CSV (last 10 simulations x up to 20 days)
                 write_recent_csv(simulation_id, day_rows)
-                pygame.time.delay(delay_ms)
+                wait_for_results_dismiss(draw_final_results)
                 break
 
             sim.reproduce_survivors()
@@ -741,9 +825,11 @@ def render_population_graph(screen: pygame.Surface, day_rows: list) -> None:
         screen.blit(lbl, (int(tx) - lbl.get_width() // 2, graph_rect.bottom + 6))
 
 
-def render_speed_graph(screen: pygame.Surface, day_rows: list) -> None:
-    """Render a graph of average speed vs day.
-    Expects day_rows as list of tuples where the second element is the average speed (float).
+def render_speed_graph(screen: pygame.Surface, day_rows: list, label_text: str = 'Average Speed vs Day (start of day)', metric_name: str = 'speed') -> None:
+    """Render a graph of an averaged trait vs day.
+
+    Expects day_rows as list of tuples where the second element is the average value (float).
+    label_text controls the title; metric_name controls the overall-average label.
     """
     width = screen.get_width()
     height = screen.get_height()
@@ -860,7 +946,7 @@ def render_speed_graph(screen: pygame.Surface, day_rows: list) -> None:
         pygame.draw.circle(screen, smooth_color, smooth_points[0], 4)
 
     font = pygame.font.SysFont(None, 18)
-    label = font.render('Average Speed vs Day (start of day)', True, (200, 200, 210))
+    label = font.render(label_text, True, (200, 200, 210))
     screen.blit(label, (graph_rect.left, graph_rect.top - 22))
 
     # day labels
@@ -869,11 +955,18 @@ def render_speed_graph(screen: pygame.Surface, day_rows: list) -> None:
     screen.blit(d_min_label, (graph_rect.left - 5, graph_rect.bottom + 4))
     screen.blit(d_max_label, (graph_rect.right - d_max_label.get_width(), graph_rect.bottom + 4))
 
+    def format_metric_value(value: float) -> str:
+        if value >= 10:
+            return str(int(round(value)))
+        if value >= 1:
+            return f'{value:.1f}'
+        return f'{value:.2f}'
+
     # y labels: 0, mid, max
     y0 = font.render('0', True, (160, 160, 170))
-    y_mid_val = int(max_speed / 2)
-    y_mid = font.render(str(y_mid_val), True, (160, 160, 170))
-    y_max = font.render(str(int(max_speed)), True, (160, 160, 170))
+    y_mid_val = max_speed / 2
+    y_mid = font.render(format_metric_value(y_mid_val), True, (160, 160, 170))
+    y_max = font.render(format_metric_value(max_speed), True, (160, 160, 170))
     screen.blit(y0, (graph_rect.left - 18, graph_rect.bottom - 8))
     screen.blit(y_mid, (graph_rect.left - 28, int(graph_rect.top + graph_rect.height / 2) - 8))
     screen.blit(y_max, (graph_rect.left - 30, graph_rect.top - 8))
@@ -904,11 +997,98 @@ def render_speed_graph(screen: pygame.Surface, day_rows: list) -> None:
             overall_avg = sum(tail) / float(len(tail))
     except Exception:
         overall_avg = 0.0
-    avg_text = font.render(f'Overall avg speed: {overall_avg:.2f}', True, (220, 220, 210))
+    avg_text = font.render(f'Overall avg {metric_name}: {overall_avg:.2f}', True, (220, 220, 210))
     # place at top-right corner but keep within window bounds
     tx = min(graph_rect.right + 8, screen.get_width() - avg_text.get_width() - 8)
     ty = max(8, graph_rect.top - 20)
     screen.blit(avg_text, (tx, ty))
+
+
+def render_mutation_traits_graphs(screen: pygame.Surface, csv_path: str) -> None:
+    """Render one or more mutation-trait graphs based on CSV columns.
+
+    CSV format: day, [average_speed], [average_size], [average_intelligence]
+    where each trait column is optional depending on the enabled mutations.
+    """
+    if not os.path.exists(csv_path):
+        width, height = screen.get_size()
+        screen.fill(BACKGROUND_COLOR)
+        font = pygame.font.SysFont(None, 20)
+        msg = font.render('CSV not found: ' + os.path.basename(csv_path), True, (200, 200, 210))
+        screen.blit(msg, (width // 2 - msg.get_width() // 2, height // 2 - 10))
+        return
+
+    # Read CSV and detect columns
+    days = []
+    speed_data = []
+    size_data = []
+    intelligence_data = []
+    has_speed = False
+    has_size = False
+    has_intelligence = False
+    
+    with open(csv_path, 'r', newline='') as f:
+        reader = csv.reader(f)
+        header = next(reader, None)
+        if header:
+            has_speed = 'average_speed' in header
+            has_size = 'average_size' in header
+            has_intelligence = 'average_intelligence' in header
+            speed_col = header.index('average_speed') if has_speed else -1
+            size_col = header.index('average_size') if has_size else -1
+            intelligence_col = header.index('average_intelligence') if has_intelligence else -1
+            
+            for r in reader:
+                try:
+                    day = int(r[0])
+                    days.append(day)
+                    if has_speed and speed_col < len(r):
+                        speed_data.append(float(r[speed_col]))
+                    if has_size and size_col < len(r):
+                        size_data.append(float(r[size_col]))
+                    if has_intelligence and intelligence_col < len(r):
+                        intelligence_data.append(float(r[intelligence_col]))
+                except Exception:
+                    continue
+    
+    if not days:
+        return
+    
+    # Normalize days to start from 1
+    if days:
+        min_day = min(days)
+        days = [d - min_day + 1 for d in days]
+    
+    # Build day_rows structures for each trait
+    speed_rows = [(d, s) for d, s in zip(days, speed_data)] if has_speed else []
+    size_rows = [(d, s) for d, s in zip(days, size_data)] if has_size else []
+    intelligence_rows = [(d, s) for d, s in zip(days, intelligence_data)] if has_intelligence else []
+    
+    graph_specs = []
+    if has_speed:
+        graph_specs.append((speed_rows, 'Average Speed vs Day (start of day)', 'speed'))
+    if has_size:
+        graph_specs.append((size_rows, 'Average Size vs Day (start of day)', 'size'))
+    if has_intelligence:
+        graph_specs.append((intelligence_rows, 'Average Intelligence vs Day (start of day)', 'intelligence'))
+
+    if not graph_specs:
+        return
+    if len(graph_specs) == 1:
+        rows, label_text, metric_name = graph_specs[0]
+        render_speed_graph(screen, rows, label_text=label_text, metric_name=metric_name)
+        return
+
+    width = screen.get_width()
+    height = screen.get_height()
+    section_height = height // len(graph_specs)
+    for idx, (rows, label_text, metric_name) in enumerate(graph_specs):
+        top = idx * section_height
+        current_height = section_height if idx < len(graph_specs) - 1 else height - top
+        section_surface = pygame.Surface((width, current_height))
+        section_surface.fill(BACKGROUND_COLOR)
+        render_speed_graph(section_surface, rows, label_text=label_text, metric_name=metric_name)
+        screen.blit(section_surface, (0, top))
 
 
 def render_csv_graph(screen: pygame.Surface, csv_path: str) -> None:

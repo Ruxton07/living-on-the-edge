@@ -63,6 +63,16 @@ class Simulation:
     def handle_creature_collision(self, creature, food_index: int) -> None:
         raise NotImplementedError
 
+    # Simulation.move_creature(creature)
+    #
+    # Hook for subclasses that need custom movement behavior.
+    #
+    # @param creature  the creature to move for one step
+    # @return None
+    #
+    def move_creature(self, creature) -> None:
+        creature.move()
+
     # Simulation.simulate_day(screen, clock)
     # 
     # @param screen  the pygame screen surface for drawing
@@ -135,14 +145,15 @@ class Simulation:
                         continue
                     if creature.energy <= 0:
                         continue
-                    creature.move()
+                    self.move_creature(creature)
                     creature.handle_edges(self.width, self.height)
                     # allow creatures to eat multiple foods per day: do not gate
                     # collisions on has_eaten. Only require the creature to be alive.
                     if creature.energy > 0:
                         collided_index: Optional[int] = None
+                        creature_radius = float(self.get_creature_radius_for(creature))
                         for idx, food in enumerate(self.foods):
-                            if self.distance(creature.position, food.position) <= (self.get_creature_radius() + self.get_food_radius()):
+                            if self.distance(creature.position, food.position) <= (creature_radius + self.get_food_radius()):
                                 collided_index = idx
                                 break
                         if collided_index is not None:
@@ -224,6 +235,13 @@ class Simulation:
 
     def get_creature_radius(self) -> int:
         raise NotImplementedError
+
+    def get_creature_radius_for(self, creature) -> float:
+        # Default: constant radius from get_creature_radius(); subclasses can override for per-creature scaling
+        try:
+            return float(self.get_creature_radius())
+        except Exception:
+            return float(0)
 
     def get_food_radius(self) -> int:
         raise NotImplementedError

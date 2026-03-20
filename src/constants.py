@@ -15,7 +15,7 @@ FOOD_RADIUS = 5
 TICKS_PER_SECOND = 60
 
 # Simulation parameters
-CREATURE_MAX_ENERGY = 750  # ticks
+CREATURE_MAX_ENERGY = 500  # ticks
 CREATURE_STEP_SIZE = 2.5   # pixels per tick
 FOOD_ENERGY = 250
 
@@ -37,3 +37,15 @@ START_CREATURES = {'basic_simulation': 5, 'greedy_simulation': 5, 'mutation_simu
 # Mutation configuration
 # Fractional +/- change applied to speed on replication (e.g. 0.05 = ±5%)
 MUTATION_SPEED_DELTA = 0.10
+# Fractional +/- change applied to size (area multiplier) on replication
+# Size represents area multiplier; radius scales with sqrt(size). Energy drain scales linearly with size.
+MUTATION_SIZE_DELTA = 0.10
+# Fractional +/- change applied to intelligence on replication
+MUTATION_INTELLIGENCE_DELTA = 0.10
+
+# Intelligence tuning
+# Higher intelligence gives a creature a better chance of steering toward nearby food.
+INTELLIGENCE_BASE_RANGE = 140
+INTELLIGENCE_BASE_ERROR_DEGREES = 55
+INTELLIGENCE_TURN_RATE = 0.30
+INTELLIGENCE_ENERGY_COST = 0.25
