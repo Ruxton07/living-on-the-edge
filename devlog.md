@@ -6,6 +6,30 @@ I started this developer log so I could document my progress on this project ove
 
 ## Entries
 
+### 03/20/2026
+
+Today I finally came back and implemented the additional mutations I had been talking about for a while, namely size and intelligence. I also made a handful of QOL changes to the program itself while I was at it, because I kept getting annoyed by the way some of the UI and simulation flow behaved during testing.
+
+The first functional change I made was adding actual intelligence as a mutation rather than leaving it as a vague idea in my notes. The way it works right now is that more intelligent creatures can detect food from farther away and steer towards it more accurately, but this is not free. Higher intelligence also costs more energy per movement, which means there is still a trade-off rather than simply making "more intelligence" always the correct answer.
+
+I also finished size mutations in a more meaningful way. Bigger creatures now have a larger radius, which makes it easier for them to collide with and consume food, but just like intelligence and speed, this comes with a cost. Larger creatures drain more energy while moving, so if they get too large they can become inefficient and die off.
+
+I like this a lot better than just giving creatures arbitrary bonuses, because it means each mutation has some advantage and some drawback. That is much closer to the kind of optimization problem I actually want this project to model.
+
+Along with that, I refactored some shared behavior so the mutation simulation could support more specialized movement logic without becoming messy, and I improved the graph flow so that when a simulation ends, the graphs remain on screen until I press `\` again instead of vanishing after a short delay. That was getting surprisingly irritating during testing because I kept wanting more time to actually look at the data.
+
+Speaking of the data, I did get a few interesting observations from one of the longer mutation runs. The most obvious thing is that speed still absolutely explodes upward over time. In this run it started at exactly `1.0`, averaged about `4.07` over the first 100 days, and by the end of the run it had reached `25.41`, with a peak of `28.43` on day `286`. So even with size and intelligence now in the mix, speed still appears to be extremely valuable in this environment.
+
+Intelligence also increased very strongly, although on a slower timescale than speed. It began at `1.0`, averaged only `1.22` over the first 100 days, but by the last 100 days it averaged `4.35`, and it peaked at `5.03` on day `598`. That is actually more dramatic than I expected. My initial suspicion was that intelligence might end up being a minor effect compared to speed, but at least in this test it seems to be consistently selected for.
+
+Size, however, behaved much more interestingly than I expected. It did increase for quite a while at first, averaging `1.17` over the first 100 days and peaking at `1.60` on day `378`, but then it gradually drifted downward. By day `500` it was down to about `0.92`, and by the end of the run it had only recovered to about `1.06`, with the last 100 days averaging `1.05`. So unlike speed and intelligence, size does not seem to just climb forever. It looks much more like there is a temporary benefit to getting bigger, after which the energy cost starts to outweigh the easier collisions.
+
+I think that is the most interesting result so far. Before running this, I had suspected that size and intelligence might behave very similarly to speed, but that does not seem to be true. Speed and intelligence both trended strongly upward across the run, whereas size rose, peaked, and then got pushed back down. That suggests the trade-off for size may be much harsher or more immediate than I originally expected.
+
+Another thing that stands out to me is that these mutations do not appear to optimize on the same timescale. Speed increased very quickly. Size changed noticeably in the early and middle parts of the run. Intelligence took longer to become extreme, but by the late run it was the trait that was still clearly climbing. I do not yet know if this is a stable pattern or just a quirk of this particular simulation, but it is definitely something worth testing more.
+
+If I continue from here, the next thing I will probably do is run more isolated tests again, but this time separately for speed, size, and intelligence so I can get cleaner graphs and tell whether these trends are actually robust. Right now the combined mutation simulation is already producing more interesting behavior than I expected, which is a good sign.
+
 ### 11/20/2025
 
 Today I made a few basic changes to the UI since I found it a pain to show other people for testing purposes. There were also a couple bugs I needed to fix that were causing unexpect UI behavior.
